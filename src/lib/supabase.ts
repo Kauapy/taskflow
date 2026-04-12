@@ -14,6 +14,19 @@ export interface Task {
   completed: boolean;
   completed_at: string | null;
   created_at: string;
+  category: string;
+  due_date: string | null;
+  attachments: string[]; // Array de URLs
+  shared_with: string[]; // Array de user_ids
+}
+
+export interface TaskShare {
+  id: string;
+  task_id: string;
+  shared_by: string;
+  shared_with: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
 }
 
 export interface UserProgress {

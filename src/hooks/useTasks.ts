@@ -27,12 +27,27 @@ export const useTasks = () => {
     fetchTasks();
   }, [user]);
 
-  const addTask = async (title: string, urgency: 'baixa' | 'media' | 'alta', location: string) => {
+  const addTask = async (
+    title: string,
+    urgency: 'baixa' | 'media' | 'alta',
+    location: string,
+    category: string = '',
+    dueDate?: string,
+    attachments: string[] = []
+  ) => {
     if (!user) return;
 
     const { data, error } = await supabase
       .from('tasks')
-      .insert([{ user_id: user.id, title, urgency, location }])
+      .insert([{
+        user_id: user.id,
+        title,
+        urgency,
+        location,
+        category,
+        due_date: dueDate || null,
+        attachments
+      }])
       .select()
       .single();
 
@@ -121,12 +136,51 @@ export const useTasks = () => {
     }
   };
 
+  const updateTask = async (taskId: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', taskId)
+      .select()
+      .single();
+
+    if (!error && data) {
+      setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+    }
+  };
+
+  const shareTask = async (taskId: string, sharedWithUserId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('task_shares')
+      .insert([{
+        task_id: taskId,
+        shared_by: user.id,
+        shared_with: sharedWithUserId,
+        status: 'pending'
+      }]);
+
+    if (!error) {
+      // Atualizar shared_with na tarefa
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        await supabase
+          .from('tasks')
+          .update({ shared_with: [...task.shared_with, sharedWithUserId] })
+          .eq('id', taskId);
+      }
+    }
+  };
+
   return {
     tasks,
     loading,
     addTask,
     completeTask,
     deleteTask,
+    updateTask,
+    shareTask,
     refetch: fetchTasks,
   };
 };

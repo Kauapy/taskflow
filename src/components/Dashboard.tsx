@@ -4,10 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
-import { LogOut, Sun, Moon, Search, Plus } from 'lucide-react';
+import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare } from 'lucide-react';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
+import Analytics from './Analytics';
 
 const Dashboard = () => {
   const { signOut } = useAuth();
@@ -16,6 +17,7 @@ const Dashboard = () => {
   const { progress, loading: progressLoading } = useProgress();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tasks' | 'analytics'>('tasks');
 
   const activeTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
@@ -30,8 +32,8 @@ const Dashboard = () => {
     task.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddTask = async (title: string, urgency: 'baixa' | 'media' | 'alta', location: string) => {
-    await addTask(title, urgency, location);
+  const handleAddTask = async (title: string, urgency: 'baixa' | 'media' | 'alta', location: string, category: string, dueDate?: string, attachments?: string[]) => {
+    await addTask(title, urgency, location, category, dueDate, attachments);
     setShowAddTask(false);
   };
 
@@ -42,6 +44,17 @@ const Dashboard = () => {
           <Logo>
             <h1>Taskflow</h1>
           </Logo>
+
+          <Tabs>
+            <Tab active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')}>
+              <CheckSquare size={18} />
+              Tarefas
+            </Tab>
+            <Tab active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')}>
+              <BarChart3 size={18} />
+              Análises
+            </Tab>
+          </Tabs>
 
           <HeaderActions>
             <ThemeToggle onClick={toggleTheme}>
@@ -55,62 +68,68 @@ const Dashboard = () => {
       </Header>
 
       <Main>
-        <Section>
-          <SectionHeader>
-            <h2>Missões</h2>
-          </SectionHeader>
-          <Missions progress={progress} loading={progressLoading} />
-        </Section>
+        {activeTab === 'tasks' ? (
+          <>
+            <Section>
+              <SectionHeader>
+                <h2>Missões</h2>
+              </SectionHeader>
+              <Missions progress={progress} loading={progressLoading} />
+            </Section>
 
-        <Section>
-          <SectionHeader>
-            <h2>Tarefas</h2>
-            <AddButton onClick={() => setShowAddTask(true)}>
-              <Plus size={20} />
-              Nova Tarefa
-            </AddButton>
-          </SectionHeader>
+            <Section>
+              <SectionHeader>
+                <h2>Tarefas</h2>
+                <AddButton onClick={() => setShowAddTask(true)}>
+                  <Plus size={20} />
+                  Nova Tarefa
+                </AddButton>
+              </SectionHeader>
 
-          <SearchBar>
-            <Search size={20} />
-            <input
-              type="text"
-              placeholder="Pesquisar tarefas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </SearchBar>
+              <SearchBar>
+                <Search size={20} />
+                <input
+                  type="text"
+                  placeholder="Pesquisar tarefas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </SearchBar>
 
-          {showAddTask && (
-            <AddTask
-              onAdd={handleAddTask}
-              onCancel={() => setShowAddTask(false)}
-            />
-          )}
+              {showAddTask && (
+                <AddTask
+                  onAdd={handleAddTask}
+                  onCancel={() => setShowAddTask(false)}
+                />
+              )}
 
-          <TasksContainer>
-            <TaskSection>
-              <TaskSectionTitle>Ativas ({filteredActiveTasks.length})</TaskSectionTitle>
-              <TaskList
-                tasks={filteredActiveTasks}
-                onComplete={completeTask}
-                onDelete={deleteTask}
-                loading={tasksLoading}
-              />
-            </TaskSection>
+              <TasksContainer>
+                <TaskSection>
+                  <TaskSectionTitle>Ativas ({filteredActiveTasks.length})</TaskSectionTitle>
+                  <TaskList
+                    tasks={filteredActiveTasks}
+                    onComplete={completeTask}
+                    onDelete={deleteTask}
+                    loading={tasksLoading}
+                  />
+                </TaskSection>
 
-            <TaskSection>
-              <TaskSectionTitle>Concluídas ({filteredCompletedTasks.length})</TaskSectionTitle>
-              <TaskList
-                tasks={filteredCompletedTasks}
-                onComplete={completeTask}
-                onDelete={deleteTask}
-                loading={tasksLoading}
-                completed
-              />
-            </TaskSection>
-          </TasksContainer>
-        </Section>
+                <TaskSection>
+                  <TaskSectionTitle>Concluídas ({filteredCompletedTasks.length})</TaskSectionTitle>
+                  <TaskList
+                    tasks={filteredCompletedTasks}
+                    onComplete={completeTask}
+                    onDelete={deleteTask}
+                    loading={tasksLoading}
+                    completed
+                  />
+                </TaskSection>
+              </TasksContainer>
+            </Section>
+          </>
+        ) : (
+          <Analytics />
+        )}
       </Main>
     </Container>
   );
@@ -291,5 +310,26 @@ const TaskSectionTitle = styled.h3`
   color: ${props => props.theme.colors.textSecondary};
   margin-bottom: 16px;
 `;
+const Tabs = styled.div`
+  display: flex;
+  gap: 8px;
+`;
 
+const Tab = styled.button<{ active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  color: ${props => props.active ? 'white' : props.theme.colors.textSecondary};
+  border: 1px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
+
+  &:hover {
+    background: ${props => props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
+  }
+`;
 export default Dashboard;

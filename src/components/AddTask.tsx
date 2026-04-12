@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { X } from 'lucide-react';
 
 interface AddTaskProps {
-  onAdd: (title: string, urgency: 'baixa' | 'media' | 'alta', location: string) => void;
+  onAdd: (title: string, urgency: 'baixa' | 'media' | 'alta', location: string, category: string, dueDate?: string, attachments?: string[]) => void;
   onCancel: () => void;
 }
 
@@ -11,15 +11,21 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
   const [title, setTitle] = useState('');
   const [urgency, setUrgency] = useState<'baixa' | 'media' | 'alta'>('media');
   const [location, setLocation] = useState('');
+  const [category, setCategory] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [attachments, setAttachments] = useState<string[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    onAdd(title, urgency, location);
+    onAdd(title, urgency, location, category, dueDate || undefined, attachments);
     setTitle('');
     setUrgency('media');
     setLocation('');
+    setCategory('');
+    setDueDate('');
+    setAttachments([]);
   };
 
   return (
@@ -81,6 +87,55 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Ex: Casa, Trabalho, Mercado"
           />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Categoria (opcional)</Label>
+          <Input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Ex: Trabalho, Pessoal, Estudos"
+          />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Data de vencimento (opcional)</Label>
+          <Input
+            type="datetime-local"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+        </FormGroup>
+
+        <FormGroup>
+          <Label>Anexos (URLs, opcional)</Label>
+          <Input
+            type="text"
+            placeholder="Cole uma URL e pressione Enter"
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const url = (e.target as HTMLInputElement).value.trim();
+                if (url) {
+                  setAttachments(prev => [...prev, url]);
+                  (e.target as HTMLInputElement).value = '';
+                }
+              }
+            }}
+          />
+          {attachments.length > 0 && (
+            <AttachmentsList>
+              {attachments.map((url, index) => (
+                <AttachmentItem key={index}>
+                  {url}
+                  <RemoveAttachment onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}>
+                    <X size={14} />
+                  </RemoveAttachment>
+                </AttachmentItem>
+              ))}
+            </AttachmentsList>
+          )}
         </FormGroup>
 
         <Actions>
@@ -255,6 +310,40 @@ const SubmitButton = styled.button`
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+`;
+
+const AttachmentsList = styled.div`
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const AttachmentItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: ${props => props.theme.colors.surface};
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const RemoveAttachment = styled.button`
+  background: transparent;
+  color: ${props => props.theme.colors.textSecondary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.error};
+    color: white;
   }
 `;
 
