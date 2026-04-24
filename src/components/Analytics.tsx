@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useAnalytics } from '../hooks/useAnalytics';
-import { TrendingUp, Clock, Target, Award } from 'lucide-react';
+import { TrendingUp, Clock, ListTodo, CheckCircle } from 'lucide-react';
 
 const Analytics = () => {
   const { analytics, loading } = useAnalytics();
@@ -19,7 +19,7 @@ const Analytics = () => {
       <MetricsGrid>
         <MetricCard>
           <MetricIcon>
-            <Target size={24} />
+            <ListTodo size={24} />
           </MetricIcon>
           <MetricContent>
             <MetricValue>{analytics.totalTasks}</MetricValue>
@@ -29,7 +29,7 @@ const Analytics = () => {
 
         <MetricCard>
           <MetricIcon>
-            <Award size={24} />
+            <CheckCircle size={24} />
           </MetricIcon>
           <MetricContent>
             <MetricValue>{analytics.completedTasks}</MetricValue>

@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { UserProgress } from '../lib/supabase';
-import { Target, TrendingUp, MapPin, Flame, Award, Zap } from 'lucide-react';
+import { Target, TrendingUp, MapPin, Flame, Award, Zap, CheckCircle } from 'lucide-react';
 
 interface MissionsProps {
   progress: UserProgress | null;
@@ -17,7 +17,7 @@ const Missions = ({ progress, loading }: MissionsProps) => {
       id: 1,
       title: 'Completar 5 tarefas',
       description: 'Complete 5 tarefas para ganhar +100 XP',
-      icon: <Target size={24} />,
+      icon: <CheckCircle size={24} />,
       current: progress.total_tasks_completed,
       target: 5,
       color: '#FF6B35',
@@ -27,11 +27,31 @@ const Missions = ({ progress, loading }: MissionsProps) => {
       id: 2,
       title: 'Completar 25 tarefas',
       description: 'Complete 25 tarefas para ganhar +500 XP',
-      icon: <TrendingUp size={24} />,
+      icon: <CheckCircle size={24} />,
       current: progress.total_tasks_completed,
       target: 25,
       color: '#FFA07A',
       reward: 500,
+    },
+    {
+      id: 5,
+      title: 'Completar 100 tarefas',
+      description: 'Uma marca histórica! Complete 100 tarefas.',
+      icon: <Award size={24} />,
+      current: progress.total_tasks_completed,
+      target: 100,
+      color: '#E0115F',
+      reward: 2500,
+    },
+    {
+      id: 6,
+      title: 'Mestre das Tarefas',
+      description: 'Complete 500 tarefas para obter um bônus especial.',
+      icon: <Award size={24} />,
+      current: progress.total_tasks_completed,
+      target: 500,
+      color: '#8A2BE2',
+      reward: 10000,
     },
     {
       id: 3,
@@ -44,6 +64,26 @@ const Missions = ({ progress, loading }: MissionsProps) => {
       reward: 150,
     },
     {
+      id: 7,
+      title: 'Explorador',
+      description: 'Use 10 localizações diferentes',
+      icon: <MapPin size={24} />,
+      current: progress.total_locations,
+      target: 10,
+      color: '#007BFF',
+      reward: 600,
+    },
+    {
+      id: 8,
+      title: 'Viajante',
+      description: 'Use 25 localizações diferentes',
+      icon: <MapPin size={24} />,
+      current: progress.total_locations,
+      target: 25,
+      color: '#0000CD',
+      reward: 2000,
+    },
+    {
       id: 4,
       title: 'Criar 10 tarefas',
       description: 'Crie 10 tarefas no total',
@@ -53,6 +93,66 @@ const Missions = ({ progress, loading }: MissionsProps) => {
       color: '#FFC107',
       reward: 200,
     },
+    {
+      id: 9,
+      title: 'Criar 50 tarefas',
+      description: 'Adicione 50 tarefas ao seu fluxo',
+      icon: <Zap size={24} />,
+      current: progress.total_tasks_created,
+      target: 50,
+      color: '#FF9800',
+      reward: 800,
+    },
+    {
+      id: 10,
+      title: 'Organizador Nato',
+      description: 'Crie 200 tarefas no total',
+      icon: <TrendingUp size={24} />,
+      current: progress.total_tasks_created,
+      target: 200,
+      color: '#FF5722',
+      reward: 3000,
+    },
+    {
+      id: 11,
+      title: 'Aquecimento',
+      description: 'Mantenha uma sequência de 3 dias seguidos',
+      icon: <Flame size={24} />,
+      current: progress.current_streak,
+      target: 3,
+      color: '#FF4500',
+      reward: 300,
+    },
+    {
+      id: 12,
+      title: 'Pegando Fogo',
+      description: 'Mantenha uma sequência de 7 dias seguidos',
+      icon: <Flame size={24} />,
+      current: progress.current_streak,
+      target: 7,
+      color: '#E25822',
+      reward: 1000,
+    },
+    {
+      id: 13,
+      title: 'Hábito Formado',
+      description: 'Alcance 30 dias seguidos completando tarefas',
+      icon: <Flame size={24} />,
+      current: progress.current_streak,
+      target: 30,
+      color: '#DC143C',
+      reward: 5000,
+    },
+    {
+      id: 14,
+      title: 'Implacável',
+      description: 'Atingir uma sequência de 100 dias!',
+      icon: <Flame size={24} />,
+      current: progress.current_streak,
+      target: 100,
+      color: '#8B0000',
+      reward: 20000,
+    }
   ];
 
   const getProgressPercentage = (current: number, target: number) => {
@@ -84,11 +184,11 @@ const Missions = ({ progress, loading }: MissionsProps) => {
 
         <StatCard>
           <StatIcon color="#28A745">
-            <Target size={28} />
+            <CheckCircle size={28} />
           </StatIcon>
           <StatInfo>
             <StatValue>{progress.total_tasks_completed}</StatValue>
-            <StatLabel>Concluídas</StatLabel>
+            <StatLabel>Tarefas Concluídas</StatLabel>
           </StatInfo>
         </StatCard>
 

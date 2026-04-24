@@ -14,10 +14,40 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [errors, setErrors] = useState<{ title?: string, date?: string }>({});
+
+  const getLocalMinDate = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    setErrors({});
+
+    let hasError = false;
+    const newErrors: { title?: string, date?: string } = {};
+
+    if (!title.trim()) {
+      newErrors.title = 'O título da tarefa não pode estar vazio.';
+      hasError = true;
+    }
+
+    if (dueDate) {
+      const selectedDate = new Date(dueDate);
+      const limit = new Date();
+      limit.setMinutes(limit.getMinutes() - 1); // 1 minuto de tolerância para preenchimento
+      if (selectedDate < limit) {
+        newErrors.date = 'A data de vencimento não pode estar no passado.';
+        hasError = true;
+      }
+    }
+
+    if (hasError) {
+      setErrors(newErrors);
+      return;
+    }
 
     onAdd(title, urgency, location, category, dueDate || undefined, attachments);
     setTitle('');
@@ -37,7 +67,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
         </CloseButton>
       </Header>
 
-      <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit} noValidate>
         <FormGroup>
           <Label>Título da tarefa</Label>
           <Input
@@ -47,6 +77,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
             placeholder="Ex: Comprar mantimentos"
             autoFocus
           />
+          {errors.title && <FieldError>{errors.title}</FieldError>}
         </FormGroup>
 
         <FormGroup>
@@ -91,12 +122,19 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
 
         <FormGroup>
           <Label>Categoria (opcional)</Label>
-          <Input
-            type="text"
+          <Select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            placeholder="Ex: Trabalho, Pessoal, Estudos"
-          />
+          >
+            <option value="">Nenhuma</option>
+            <option value="Trabalho">Trabalho</option>
+            <option value="Pessoal">Pessoal</option>
+            <option value="Estudos">Estudos</option>
+            <option value="Saúde">Saúde</option>
+            <option value="Casa">Casa</option>
+            <option value="Financeiro">Financeiro</option>
+            <option value="Outros">Outros</option>
+          </Select>
         </FormGroup>
 
         <FormGroup>
@@ -105,7 +143,9 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
             type="datetime-local"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
+            min={getLocalMinDate()}
           />
+          {errors.date && <FieldError>{errors.date}</FieldError>}
         </FormGroup>
 
         <FormGroup>
@@ -150,6 +190,13 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
     </Container>
   );
 };
+
+const FieldError = styled.span`
+  color: ${props => props.theme.colors.error};
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+`;
 
 const Container = styled.div`
   background: ${props => props.theme.colors.background};
@@ -223,6 +270,36 @@ const Input = styled.input`
 
   &::placeholder {
     color: ${props => props.theme.colors.textSecondary};
+  }
+
+  /* Melhorias para inputs de date/time nativos */
+  color-scheme: dark; /* Força o popup do calendário a usar tema escuro (Chrome/Edge) */
+  
+  &::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: 0.2s ease;
+    /* Caso o color-scheme não funcione em navegadores antigos, inverte a cor do ícone: filter: invert(0.8); */
+  }
+
+  &::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+`;
+
+const Select = styled.select`
+  padding: 12px 14px;
+  border: 2px solid ${props => props.theme.colors.border};
+  border-radius: 10px;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  font-size: 15px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
   }
 `;
 

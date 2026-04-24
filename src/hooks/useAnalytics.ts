@@ -121,6 +121,10 @@ export const useAnalytics = () => {
       .eq('user_id', user.id)
       .maybeSingle();
 
+    if (progressError) {
+      console.error('Erro ao buscar progresso:', progressError);
+    }
+
     if (!tasksError && tasks) {
       const analyticsData = calculateAnalytics(tasks, progress);
       setAnalytics(analyticsData);

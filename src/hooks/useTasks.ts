@@ -51,6 +51,10 @@ export const useTasks = () => {
       .select()
       .single();
 
+    if (error) {
+      console.error('ERRO AO CRIAR TAREFA:', error);
+    }
+
     if (!error && data) {
       setTasks(prev => [data, ...prev]);
       await updateProgress('task_created', location);
