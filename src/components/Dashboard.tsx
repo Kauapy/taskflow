@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
-import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare } from 'lucide-react';
+import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type } from 'lucide-react';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
@@ -12,7 +12,7 @@ import Analytics from './Analytics';
 
 const Dashboard = () => {
   const { signOut } = useAuth();
-  const { toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark, a11yZoom, toggleA11yZoom } = useTheme();
   const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask, updateTask } = useTasks();
   const { progress, loading: progressLoading } = useProgress();
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,10 +67,14 @@ const Dashboard = () => {
           </Tabs>
 
           <HeaderActions>
-            <ThemeToggle onClick={toggleTheme}>
+            <A11yToggle onClick={toggleA11yZoom} title={`Tamanho da fonte: ${a11yZoom === 1 ? 'Normal' : a11yZoom === 1.1 ? 'Médio' : 'Grande'}`}>
+              <Type size={20} />
+              {a11yZoom > 1 && <ZoomBadge>{a11yZoom === 1.1 ? '+' : '++'}</ZoomBadge>}
+            </A11yToggle>
+            <ThemeToggle onClick={toggleTheme} title="Alternar tema">
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </ThemeToggle>
-            <LogoutButton onClick={signOut}>
+            <LogoutButton onClick={signOut} title="Sair">
               <LogOut size={20} />
             </LogoutButton>
           </HeaderActions>
@@ -209,6 +213,39 @@ const ThemeToggle = styled.button`
     color: white;
     transform: scale(1.05);
   }
+`;
+
+const A11yToggle = styled.button`
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.primary};
+  border: 2px solid ${props => props.theme.colors.border};
+  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.primary};
+    color: white;
+    transform: scale(1.05);
+  }
+`;
+
+const ZoomBadge = styled.span`
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: ${props => props.theme.colors.success};
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 4px;
+  border-radius: 8px;
+  line-height: 1;
 `;
 
 const LogoutButton = styled.button`
