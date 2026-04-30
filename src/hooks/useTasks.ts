@@ -34,31 +34,38 @@ export const useTasks = () => {
     category: string = '',
     dueDate?: string,
     attachments: string[] = []
-  ) => {
-    if (!user) return;
+  ): Promise<{ success: boolean; errorMessage?: string }> => {
+    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
+
+    // Apenas colunas confirmadas na tabela tasks.
+    // Execute a migration SQL no Supabase para habilitar category, due_date, attachments.
+    const insertPayload: Record<string, unknown> = {
+      user_id: user.id,
+      title,
+      urgency,
+      location,
+    };
+
+    console.log('Inserindo tarefa:', JSON.stringify(insertPayload));
 
     const { data, error } = await supabase
       .from('tasks')
-      .insert([{
-        user_id: user.id,
-        title,
-        urgency,
-        location,
-        category,
-        due_date: dueDate || null,
-        attachments
-      }])
+      .insert([insertPayload])
       .select()
       .single();
 
     if (error) {
-      console.error('ERRO AO CRIAR TAREFA:', error);
+      const msg = `[${error.code}] ${error.message} — ${error.details ?? ''}`;
+      console.error('ERRO AO CRIAR TAREFA:', msg);
+      return { success: false, errorMessage: msg };
     }
 
-    if (!error && data) {
+    if (data) {
       setTasks(prev => [data, ...prev]);
       await updateProgress('task_created', location);
     }
+
+    return { success: true };
   };
 
   const completeTask = async (taskId: string) => {

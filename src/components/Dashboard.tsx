@@ -13,11 +13,12 @@ import Analytics from './Analytics';
 const Dashboard = () => {
   const { signOut } = useAuth();
   const { toggleTheme, isDark } = useTheme();
-  const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask } = useTasks();
+  const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask, updateTask } = useTasks();
   const { progress, loading: progressLoading } = useProgress();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'analytics'>('tasks');
+  const [taskError, setTaskError] = useState<string | null>(null);
 
   const activeTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
@@ -33,8 +34,17 @@ const Dashboard = () => {
   );
 
   const handleAddTask = async (title: string, urgency: 'baixa' | 'media' | 'alta', location: string, category: string, dueDate?: string, attachments?: string[]) => {
-    await addTask(title, urgency, location, category, dueDate, attachments);
-    setShowAddTask(false);
+    setTaskError(null);
+    const result = await addTask(title, urgency, location, category, dueDate, attachments);
+    if (result?.success) {
+      setShowAddTask(false);
+    } else {
+      setTaskError(result?.errorMessage ?? 'Erro desconhecido ao criar tarefa.');
+    }
+  };
+
+  const handleEditTask = async (id: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => {
+    await updateTask(id, updates);
   };
 
   return (
@@ -96,10 +106,16 @@ const Dashboard = () => {
                 />
               </SearchBar>
 
+              {taskError && (
+                <ErrorBanner>
+                  <strong>Erro ao criar tarefa:</strong> {taskError}
+                </ErrorBanner>
+              )}
+
               {showAddTask && (
                 <AddTask
                   onAdd={handleAddTask}
-                  onCancel={() => setShowAddTask(false)}
+                  onCancel={() => { setShowAddTask(false); setTaskError(null); }}
                 />
               )}
 
@@ -110,6 +126,7 @@ const Dashboard = () => {
                     tasks={filteredActiveTasks}
                     onComplete={completeTask}
                     onDelete={deleteTask}
+                    onEdit={handleEditTask}
                     loading={tasksLoading}
                   />
                 </TaskSection>
@@ -120,6 +137,7 @@ const Dashboard = () => {
                     tasks={filteredCompletedTasks}
                     onComplete={completeTask}
                     onDelete={deleteTask}
+                    onEdit={handleEditTask}
                     loading={tasksLoading}
                     completed
                   />
@@ -332,4 +350,21 @@ const Tab = styled.button<{ active: boolean }>`
     background: ${props => props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
   }
 `;
+
+const ErrorBanner = styled.div`
+  background: #fee2e2;
+  border: 1.5px solid #f87171;
+  border-radius: 10px;
+  color: #b91c1c;
+  padding: 12px 16px;
+  font-size: 14px;
+  margin-bottom: 12px;
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 15px;
+  }
+`;
+
 export default Dashboard;
