@@ -4,11 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
-import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type } from 'lucide-react';
+import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type, Inbox } from 'lucide-react';
 import { Task } from '../lib/supabase';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
+import SharedTasks from './SharedTasks';
+import ShareTaskDialog from './ShareTaskDialog';
 
 // Lazy-load: o bundle do recharts (~200kB) só carrega quando o usuário abre a aba Análises.
 const Analytics = lazy(() => import('./Analytics'));
@@ -16,12 +18,13 @@ const Analytics = lazy(() => import('./Analytics'));
 const Dashboard = () => {
   const { signOut } = useAuth();
   const { toggleTheme, isDark, a11yZoom, toggleA11yZoom } = useTheme();
-  const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask, updateTask } = useTasks();
+  const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask, updateTask, shareTask } = useTasks();
   const { progress, loading: progressLoading } = useProgress();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'analytics'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'shared' | 'analytics'>('tasks');
   const [taskError, setTaskError] = useState<string | null>(null);
+  const [sharingTask, setSharingTask] = useState<Task | null>(null);
 
   const activeTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
@@ -60,11 +63,15 @@ const Dashboard = () => {
 
           <Tabs>
             <Tab active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')}>
-              <CheckSquare size={18} />
+              <CheckSquare size={18} aria-hidden="true" />
               Tarefas
             </Tab>
+            <Tab active={activeTab === 'shared'} onClick={() => setActiveTab('shared')}>
+              <Inbox size={18} aria-hidden="true" />
+              Compartilhadas
+            </Tab>
             <Tab active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')}>
-              <BarChart3 size={18} />
+              <BarChart3 size={18} aria-hidden="true" />
               Análises
             </Tab>
           </Tabs>
@@ -93,7 +100,7 @@ const Dashboard = () => {
       </Header>
 
       <Main>
-        {activeTab === 'tasks' ? (
+        {activeTab === 'tasks' && (
           <>
             <Section>
               <SectionHeader>
@@ -106,18 +113,19 @@ const Dashboard = () => {
               <SectionHeader>
                 <h2>Tarefas</h2>
                 <AddButton onClick={() => setShowAddTask(true)}>
-                  <Plus size={20} />
+                  <Plus size={20} aria-hidden="true" />
                   Nova Tarefa
                 </AddButton>
               </SectionHeader>
 
               <SearchBar>
-                <Search size={20} />
+                <Search size={20} aria-hidden="true" />
                 <input
                   type="text"
                   placeholder="Pesquisar tarefas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  aria-label="Pesquisar tarefas"
                 />
               </SearchBar>
 
@@ -142,6 +150,7 @@ const Dashboard = () => {
                     onComplete={completeTask}
                     onDelete={deleteTask}
                     onEdit={handleEditTask}
+                    onShare={setSharingTask}
                     loading={tasksLoading}
                   />
                 </TaskSection>
@@ -153,6 +162,7 @@ const Dashboard = () => {
                     onComplete={completeTask}
                     onDelete={deleteTask}
                     onEdit={handleEditTask}
+                    onShare={setSharingTask}
                     loading={tasksLoading}
                     completed
                   />
@@ -160,12 +170,29 @@ const Dashboard = () => {
               </TasksContainer>
             </Section>
           </>
-        ) : (
+        )}
+
+        {activeTab === 'shared' && (
+          <Section>
+            <SectionHeader>
+              <h2>Compartilhadas comigo</h2>
+            </SectionHeader>
+            <SharedTasks />
+          </Section>
+        )}
+
+        {activeTab === 'analytics' && (
           <Suspense fallback={<TaskSectionTitle>Carregando análises…</TaskSectionTitle>}>
             <Analytics />
           </Suspense>
         )}
       </Main>
+
+      <ShareTaskDialog
+        task={sharingTask}
+        onShare={shareTask}
+        onClose={() => setSharingTask(null)}
+      />
     </Container>
   );
 };

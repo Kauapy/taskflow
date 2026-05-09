@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { Task } from '../lib/supabase';
 import {
   CheckCircle2, Circle, Trash2, MapPin, AlertCircle,
-  Pencil, Check, X, Clock, ChevronDown, ChevronUp
+  Pencil, Check, X, Clock, ChevronDown, ChevronUp, Share2
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -12,6 +12,7 @@ interface TaskListProps {
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => void;
+  onShare?: (task: Task) => void;
   loading: boolean;
   completed?: boolean;
 }
@@ -57,9 +58,10 @@ interface TaskCardItemProps {
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => void;
+  onShare?: (task: Task) => void;
 }
 
-const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCardItemProps) => {
+const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit, onShare }: TaskCardItemProps) => {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -234,6 +236,16 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
                   <Pencil size={15} aria-hidden="true" />
                 </ActionBtn>
               )}
+              {onShare && (
+                <ActionBtn
+                  title="Compartilhar"
+                  variant="neutral"
+                  onClick={() => onShare(task)}
+                  aria-label={`Compartilhar tarefa "${task.title}"`}
+                >
+                  <Share2 size={15} aria-hidden="true" />
+                </ActionBtn>
+              )}
               <DeleteBtn
                 onClick={() => setConfirmOpen(true)}
                 title="Apagar"
@@ -307,7 +319,7 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-const TaskList = ({ tasks, onComplete, onDelete, onEdit, loading, completed = false }: TaskListProps) => {
+const TaskList = ({ tasks, onComplete, onDelete, onEdit, onShare, loading, completed = false }: TaskListProps) => {
   if (loading) return <StatusText>Carregando tarefas...</StatusText>;
   if (tasks.length === 0) return (
     <EmptyState>
@@ -326,6 +338,7 @@ const TaskList = ({ tasks, onComplete, onDelete, onEdit, loading, completed = fa
           onComplete={onComplete}
           onDelete={onDelete}
           onEdit={onEdit}
+          onShare={onShare}
         />
       ))}
     </List>

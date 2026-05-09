@@ -87,6 +87,7 @@ supabase/
 3. Em **SQL Editor**, execute, na ordem, os arquivos:
    - `supabase/migrations/20260308191517_create_taskflow_schema.sql` — cria as tabelas `tasks` e `user_progress`, ativa RLS, cria políticas e o trigger que cria automaticamente o registro de progresso quando um usuário se cadastra.
    - `supabase/migrations/20260411100000_add_advanced_task_features.sql` — adiciona colunas `category`, `due_date`, `attachments`, `shared_with` e cria a tabela `task_shares`.
+   - `supabase/migrations/20260509120000_add_profiles_and_sharing.sql` — cria a tabela `profiles` (espelho público de e-mails para lookup), trigger de backfill, RPCs `find_user_id_by_email` e `get_incoming_shares` (ambas SECURITY DEFINER), e novas políticas RLS para compartilhamento.
 4. (Opcional, durante desenvolvimento) Em **Authentication → Configuration**, desative “Confirm email” se quiser criar contas de teste sem confirmar e-mail.
 
 ## Scripts disponíveis
@@ -112,7 +113,10 @@ supabase/
 **Tabela `task_shares`**
 - Convites de compartilhamento entre usuários (status `pending` / `accepted` / `declined`).
 
-Todas as tabelas usam **Row Level Security**: cada usuário só lê e escreve seus próprios dados.
+**Tabela `profiles`**
+- Espelho público de `auth.users` apenas com `id` + `email`. Permite lookup por e-mail via RPC sem expor o resto do `auth`.
+
+Todas as tabelas usam **Row Level Security**. Cada usuário só lê e escreve seus próprios dados; tarefas com `task_share` aceito ficam visíveis para o destinatário (somente leitura). Lookups por e-mail e listagem de compartilhamentos recebidos passam por RPCs `SECURITY DEFINER`.
 
 ## Funcionalidades
 
@@ -121,22 +125,22 @@ Todas as tabelas usam **Row Level Security**: cada usuário só lê e escreve se
 - 🎮 Sistema de gamificação: XP por ação, nível calculado a partir de XP, missões com progresso visual
 - 🔥 Sequência (streak) de dias consecutivos completando tarefas
 - 📊 Dashboard analítico: progresso semanal e mensal (charts), taxa de produtividade, tempo médio de conclusão
+- 🤝 Compartilhamento de tarefas por e-mail, com fluxo aceitar/recusar
 - 🌗 Tema claro/escuro com persistência em `localStorage`
 - 🔍 Busca em tempo real por título e localização
 - ⏱️ Contagem regressiva ao vivo para tarefas com data de vencimento
 
 ## Limitações conhecidas
 
-- Compartilhamento de tarefas (`task_shares`) está modelado no banco, mas a UI ainda não está completa (Fase 3 do roadmap).
 - Não há testes automatizados ainda (Fase 4 do roadmap).
-- Bundle único — `recharts` poderia ser lazy-loaded (Fase 2 do roadmap).
-- Acessibilidade pode ser melhorada (`aria-label` em botões só de ícone, alternativa ao `style.zoom`).
+- Tarefas compartilhadas são read-only para o destinatário (não há merge de progresso entre os dois usuários).
+- 6 vulnerabilidades em dev-deps do Vite que exigiriam upgrade major (avaliar em PR separado).
 
 ## Roadmap
 
-- [ ] Modal de confirmação de exclusão
-- [ ] Lazy-load do dashboard analítico
-- [ ] UI completa de compartilhamento de tarefas
+- [x] Modal de confirmação de exclusão
+- [x] Lazy-load do dashboard analítico
+- [x] UI completa de compartilhamento de tarefas
 - [ ] Testes unitários, de integração e E2E
 - [ ] Documentação acadêmica (problema, justificativa, ERD, diagramas)
 

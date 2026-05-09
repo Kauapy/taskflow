@@ -29,6 +29,26 @@ export interface TaskShare {
   created_at: string;
 }
 
+export interface Profile {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface IncomingShare {
+  id: string;                                   // task_share id
+  task_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  shared_by: string;
+  sharer_email: string;
+  task_title: string;
+  task_urgency: 'baixa' | 'media' | 'alta';
+  task_completed: boolean;
+  task_due_date: string | null;
+  task_location: string | null;
+  created_at: string;
+}
+
 export interface UserProgress {
   id: string;
   user_id: string;

@@ -218,27 +218,69 @@ export const useTasks = () => {
     }
   };
 
-  const shareTask = async (taskId: string, sharedWithUserId: string) => {
-    if (!user) return;
+  const findUserIdByEmail = async (email: string): Promise<string | null> => {
+    const { data, error } = await supabase.rpc('find_user_id_by_email', { p_email: email });
+    if (error) {
+      console.error('Erro no lookup de e-mail:', error);
+      return null;
+    }
+    return (data as string | null) ?? null;
+  };
+
+  const shareTask = async (
+    taskId: string,
+    email: string
+  ): Promise<{ success: boolean; errorMessage?: string }> => {
+    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
+
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      return { success: false, errorMessage: 'Informe um e-mail.' };
+    }
+    if (trimmed === (user.email ?? '').toLowerCase()) {
+      return { success: false, errorMessage: 'Você não pode compartilhar com você mesmo.' };
+    }
+
+    const recipientId = await findUserIdByEmail(trimmed);
+    if (!recipientId) {
+      return { success: false, errorMessage: 'Nenhum usuário cadastrado com esse e-mail.' };
+    }
+
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.shared_with?.includes(recipientId)) {
+      return { success: false, errorMessage: 'Esta tarefa já foi compartilhada com esse usuário.' };
+    }
 
     const { error } = await supabase
       .from('task_shares')
       .insert([{
         task_id: taskId,
         shared_by: user.id,
-        shared_with: sharedWithUserId,
-        status: 'pending'
+        shared_with: recipientId,
+        status: 'pending',
       }]);
 
-    if (!error) {
-      const task = tasks.find(t => t.id === taskId);
-      if (task) {
-        await supabase
-          .from('tasks')
-          .update({ shared_with: [...task.shared_with, sharedWithUserId] })
-          .eq('id', taskId);
+    if (error) {
+      // 23505 = unique violation: já existe um share para esse par (task_id, shared_with)
+      if (error.code === '23505') {
+        return { success: false, errorMessage: 'Esta tarefa já foi compartilhada com esse usuário.' };
       }
+      return { success: false, errorMessage: error.message };
     }
+
+    if (task) {
+      await supabase
+        .from('tasks')
+        .update({ shared_with: [...(task.shared_with ?? []), recipientId] })
+        .eq('id', taskId);
+      setTasks(prev => prev.map(t =>
+        t.id === taskId
+          ? { ...t, shared_with: [...(t.shared_with ?? []), recipientId] }
+          : t
+      ));
+    }
+
+    return { success: true };
   };
 
   return {
@@ -249,6 +291,7 @@ export const useTasks = () => {
     deleteTask,
     updateTask,
     shareTask,
+    findUserIdByEmail,
     refetch: fetchTasks,
   };
 };
