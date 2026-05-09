@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, Task } from '../lib/supabase';
+import { applyStreakOnCompletion } from '../lib/streak';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useTasks = () => {
@@ -159,29 +160,13 @@ export const useTasks = () => {
       updates.total_tasks_completed = progress.total_tasks_completed + 1;
       newXp += 50;
 
-      // Streak: comparar dia da última atividade vs hoje (timezone local)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const last = progress.last_activity ? new Date(progress.last_activity) : null;
-      if (last) {
-        const lastDay = new Date(last);
-        lastDay.setHours(0, 0, 0, 0);
-        const diffDays = Math.round(
-          (today.getTime() - lastDay.getTime()) / 86400000
-        );
-
-        if (diffDays === 0) {
-          // mesma janela diária — sem mudança no streak
-        } else if (diffDays === 1) {
-          newCurrentStreak += 1;
-        } else {
-          newCurrentStreak = 1;
-        }
-      } else {
-        newCurrentStreak = 1;
-      }
-      newBestStreak = Math.max(newBestStreak, newCurrentStreak);
+      const streak = applyStreakOnCompletion({
+        currentStreak: newCurrentStreak,
+        bestStreak: newBestStreak,
+        lastActivity: progress.last_activity,
+      });
+      newCurrentStreak = streak.currentStreak;
+      newBestStreak = streak.bestStreak;
       updates.current_streak = newCurrentStreak;
       updates.best_streak = newBestStreak;
     }
