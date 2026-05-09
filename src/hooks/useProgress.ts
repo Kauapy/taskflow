@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, UserProgress } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -7,7 +7,7 @@ export const useProgress = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const fetchProgress = async () => {
+  const fetchProgress = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -21,7 +21,7 @@ export const useProgress = () => {
       setProgress(data);
     }
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -51,7 +51,7 @@ export const useProgress = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchProgress]);
 
   return { progress, loading, refetch: fetchProgress };
 };

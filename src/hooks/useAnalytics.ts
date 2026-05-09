@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, Task, UserProgress } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -102,7 +102,7 @@ export const useAnalytics = () => {
     };
   };
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -131,11 +131,11 @@ export const useAnalytics = () => {
     }
 
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [user]);
+  }, [fetchAnalytics]);
 
   return {
     analytics,

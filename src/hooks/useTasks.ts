@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, Task } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -7,7 +7,7 @@ export const useTasks = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -21,11 +21,11 @@ export const useTasks = () => {
       setTasks(data);
     }
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchTasks();
-  }, [user]);
+  }, [fetchTasks]);
 
   const recalcLocations = async () => {
     if (!user) return;

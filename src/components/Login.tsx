@@ -40,7 +40,10 @@ const Login = () => {
 
   return (
     <Container>
-      <ThemeToggle onClick={toggleTheme}>
+      <ThemeToggle
+        onClick={toggleTheme}
+        aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+      >
         {isDark ? <Sun size={20} /> : <Moon size={20} />}
       </ThemeToggle>
 

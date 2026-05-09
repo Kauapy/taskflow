@@ -5,6 +5,7 @@ import {
   CheckCircle2, Circle, Trash2, MapPin, AlertCircle,
   Pencil, Check, X, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface TaskListProps {
   tasks: Task[];
@@ -66,7 +67,7 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
   const [editLocation, setEditLocation] = useState(task.location || '');
   const [editCategory, setEditCategory] = useState(task.category || '');
   const [editDueDate, setEditDueDate] = useState(task.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : '');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const { label: countdown, isOverdue } = useCountdown(task.due_date);
 
@@ -100,12 +101,9 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
     setEditing(false);
   };
 
-  const handleDeleteClick = () => {
-    if (confirmDelete) { onDelete(task.id); }
-    else {
-      setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 3000);
-    }
+  const handleDeleteConfirm = () => {
+    setConfirmOpen(false);
+    onDelete(task.id);
   };
 
   return (
@@ -113,10 +111,16 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
       {/* ── Top row ─────────────────────────────────────── */}
       <TopRow>
         {/* Check button */}
-        <CheckBtn onClick={handleCheck} completed={task.completed} checking={checking} disabled={completed}>
+        <CheckBtn
+          onClick={handleCheck}
+          completed={task.completed}
+          checking={checking}
+          disabled={completed}
+          aria-label={task.completed ? `Tarefa "${task.title}" concluída` : `Marcar "${task.title}" como concluída`}
+        >
           {task.completed || checking
-            ? <CheckCircle2 size={26} />
-            : <Circle size={26} />}
+            ? <CheckCircle2 size={26} aria-hidden="true" />
+            : <Circle size={26} aria-hidden="true" />}
         </CheckBtn>
 
         {/* Title / edit form */}
@@ -211,25 +215,39 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
         <Actions>
           {editing ? (
             <>
-              <ActionBtn title="Salvar" variant="success" onClick={handleSaveEdit}>
-                <Check size={16} />
+              <ActionBtn title="Salvar" variant="success" onClick={handleSaveEdit} aria-label="Salvar alterações">
+                <Check size={16} aria-hidden="true" />
               </ActionBtn>
-              <ActionBtn title="Cancelar" variant="neutral" onClick={handleCancelEdit}>
-                <X size={16} />
+              <ActionBtn title="Cancelar" variant="neutral" onClick={handleCancelEdit} aria-label="Cancelar edição">
+                <X size={16} aria-hidden="true" />
               </ActionBtn>
             </>
           ) : (
             <>
               {!completed && onEdit && (
-                <ActionBtn title="Editar" variant="neutral" onClick={() => { setEditing(true); setExpanded(false); }}>
-                  <Pencil size={15} />
+                <ActionBtn
+                  title="Editar"
+                  variant="neutral"
+                  onClick={() => { setEditing(true); setExpanded(false); }}
+                  aria-label={`Editar tarefa "${task.title}"`}
+                >
+                  <Pencil size={15} aria-hidden="true" />
                 </ActionBtn>
               )}
-              <DeleteBtn confirm={confirmDelete} onClick={handleDeleteClick} title={confirmDelete ? 'Clique para confirmar' : 'Apagar'}>
-                {confirmDelete ? <><X size={14}/> Confirmar</> : <Trash2 size={15} />}
+              <DeleteBtn
+                onClick={() => setConfirmOpen(true)}
+                title="Apagar"
+                aria-label={`Excluir tarefa "${task.title}"`}
+              >
+                <Trash2 size={15} aria-hidden="true" />
               </DeleteBtn>
-              <ExpandBtn onClick={() => setExpanded(p => !p)} title="Detalhes">
-                {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <ExpandBtn
+                onClick={() => setExpanded(p => !p)}
+                title="Detalhes"
+                aria-label={expanded ? 'Ocultar detalhes' : 'Mostrar detalhes'}
+                aria-expanded={expanded}
+              >
+                {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
               </ExpandBtn>
             </>
           )}
@@ -273,6 +291,16 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
 
       {/* ── Urgency accent bar ───────────────────────────── */}
       <AccentBar color={urgency.color} />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Excluir tarefa"
+        message={`Tem certeza que deseja excluir "${task.title}"? Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Card>
   );
 };
@@ -549,23 +577,19 @@ const ActionBtn = styled.button<{ variant: 'success' | 'neutral' }>`
   }
 `;
 
-const DeleteBtn = styled.button<{ confirm: boolean }>`
+const DeleteBtn = styled.button`
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: ${p => p.confirm ? '4px 10px' : '0'};
-  width: ${p => p.confirm ? 'auto' : '32px'};
-  height: 32px;
   justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  background: ${p => p.confirm ? '#DC2626' : 'transparent'};
-  color: ${p => p.confirm ? '#fff' : '#EF4444'};
-  border: ${p => p.confirm ? 'none' : '1.5px solid transparent'};
+  background: transparent;
+  color: #EF4444;
+  border: 1.5px solid transparent;
   transition: all 0.2s;
   &:hover {
-    background: ${p => p.confirm ? '#B91C1C' : '#FEE2E2'};
+    background: #FEE2E2;
     border-color: #FCA5A5;
   }
 `;

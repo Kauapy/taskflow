@@ -14,7 +14,12 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
-  const [errors, setErrors] = useState<{ title?: string, date?: string }>({});
+  const [attachmentError, setAttachmentError] = useState<string>('');
+  const [errors, setErrors] = useState<{ title?: string; date?: string; location?: string }>({});
+
+  const TITLE_MAX = 200;
+  const LOCATION_MAX = 100;
+  const SAFE_URL_SCHEMES = new Set(['http:', 'https:']);
 
   const getLocalMinDate = () => {
     const now = new Date();
@@ -22,16 +27,30 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
     return now.toISOString().slice(0, 16);
   };
 
+  const isSafeUrl = (raw: string): boolean => {
+    try {
+      const u = new URL(raw);
+      return SAFE_URL_SCHEMES.has(u.protocol);
+    } catch {
+      return false;
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
-    let hasError = false;
-    const newErrors: { title?: string, date?: string } = {};
+    const newErrors: { title?: string; date?: string; location?: string } = {};
 
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       newErrors.title = 'O título da tarefa não pode estar vazio.';
-      hasError = true;
+    } else if (trimmedTitle.length > TITLE_MAX) {
+      newErrors.title = `O título excede ${TITLE_MAX} caracteres.`;
+    }
+
+    if (location.length > LOCATION_MAX) {
+      newErrors.location = `A localização excede ${LOCATION_MAX} caracteres.`;
     }
 
     if (dueDate) {
@@ -40,16 +59,15 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
       limit.setMinutes(limit.getMinutes() - 1); // 1 minuto de tolerância para preenchimento
       if (selectedDate < limit) {
         newErrors.date = 'A data de vencimento não pode estar no passado.';
-        hasError = true;
       }
     }
 
-    if (hasError) {
+    if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    onAdd(title, urgency, location, category, dueDate || undefined, attachments);
+    onAdd(trimmedTitle, urgency, location.trim(), category, dueDate || undefined, attachments);
     setTitle('');
     setUrgency('media');
     setLocation('');
@@ -62,8 +80,8 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
     <Container>
       <Header>
         <h3>Nova Tarefa</h3>
-        <CloseButton onClick={onCancel}>
-          <X size={20} />
+        <CloseButton onClick={onCancel} aria-label="Fechar formulário">
+          <X size={20} aria-hidden="true" />
         </CloseButton>
       </Header>
 
@@ -75,6 +93,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Ex: Comprar mantimentos"
+            maxLength={200}
             autoFocus
           />
           {errors.title && <FieldError>{errors.title}</FieldError>}
@@ -117,7 +136,9 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Ex: Casa, Trabalho, Mercado"
+            maxLength={100}
           />
+          {errors.location && <FieldError>{errors.location}</FieldError>}
         </FormGroup>
 
         <FormGroup>
@@ -152,25 +173,34 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
           <Label>Anexos (URLs, opcional)</Label>
           <Input
             type="text"
-            placeholder="Cole uma URL e pressione Enter"
-            onKeyPress={(e) => {
+            placeholder="Cole uma URL http(s) e pressione Enter"
+            onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                const url = (e.target as HTMLInputElement).value.trim();
-                if (url) {
-                  setAttachments(prev => [...prev, url]);
-                  (e.target as HTMLInputElement).value = '';
+                const target = e.target as HTMLInputElement;
+                const url = target.value.trim();
+                if (!url) return;
+                if (!isSafeUrl(url)) {
+                  setAttachmentError('Apenas URLs http:// ou https:// são aceitas.');
+                  return;
                 }
+                setAttachmentError('');
+                setAttachments(prev => [...prev, url]);
+                target.value = '';
               }
             }}
           />
+          {attachmentError && <FieldError>{attachmentError}</FieldError>}
           {attachments.length > 0 && (
             <AttachmentsList>
               {attachments.map((url, index) => (
                 <AttachmentItem key={index}>
                   {url}
-                  <RemoveAttachment onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}>
-                    <X size={14} />
+                  <RemoveAttachment
+                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
+                    aria-label={`Remover anexo ${url}`}
+                  >
+                    <X size={14} aria-hidden="true" />
                   </RemoveAttachment>
                 </AttachmentItem>
               ))}

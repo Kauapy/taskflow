@@ -51,8 +51,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem('taskflow-zoom', a11yZoom.toString());
-    // Aplica o zoom diretamente no HTML (suportado na maioria dos navegadores modernos)
-    (document.documentElement.style as any).zoom = a11yZoom;
+    // CSS `zoom` é suportado por Chromium, Safari e Firefox 126+ (2024).
+    // Em navegadores antigos, ignoram silenciosamente e o usuário ainda pode usar Ctrl+/-.
+    document.documentElement.style.zoom = String(a11yZoom);
   }, [a11yZoom]);
 
   return (

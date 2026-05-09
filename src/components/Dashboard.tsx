@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -9,7 +9,9 @@ import { Task } from '../lib/supabase';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
-import Analytics from './Analytics';
+
+// Lazy-load: o bundle do recharts (~200kB) só carrega quando o usuário abre a aba Análises.
+const Analytics = lazy(() => import('./Analytics'));
 
 const Dashboard = () => {
   const { signOut } = useAuth();
@@ -68,15 +70,23 @@ const Dashboard = () => {
           </Tabs>
 
           <HeaderActions>
-            <A11yToggle onClick={toggleA11yZoom} title={`Tamanho da fonte: ${a11yZoom === 1 ? 'Normal' : a11yZoom === 1.1 ? 'Médio' : 'Grande'}`}>
-              <Type size={20} />
+            <A11yToggle
+              onClick={toggleA11yZoom}
+              title={`Tamanho da fonte: ${a11yZoom === 1 ? 'Normal' : a11yZoom === 1.1 ? 'Médio' : 'Grande'}`}
+              aria-label={`Alterar tamanho da fonte (atual: ${a11yZoom === 1 ? 'normal' : a11yZoom === 1.1 ? 'médio' : 'grande'})`}
+            >
+              <Type size={20} aria-hidden="true" />
               {a11yZoom > 1 && <ZoomBadge>{a11yZoom === 1.1 ? '+' : '++'}</ZoomBadge>}
             </A11yToggle>
-            <ThemeToggle onClick={toggleTheme} title="Alternar tema">
-              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+            <ThemeToggle
+              onClick={toggleTheme}
+              title="Alternar tema"
+              aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+            >
+              {isDark ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
             </ThemeToggle>
-            <LogoutButton onClick={signOut} title="Sair">
-              <LogOut size={20} />
+            <LogoutButton onClick={signOut} title="Sair" aria-label="Sair da conta">
+              <LogOut size={20} aria-hidden="true" />
             </LogoutButton>
           </HeaderActions>
         </HeaderContent>
@@ -151,7 +161,9 @@ const Dashboard = () => {
             </Section>
           </>
         ) : (
-          <Analytics />
+          <Suspense fallback={<TaskSectionTitle>Carregando análises…</TaskSectionTitle>}>
+            <Analytics />
+          </Suspense>
         )}
       </Main>
     </Container>
