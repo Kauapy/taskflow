@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { UserProgress } from '../lib/supabase';
-import { Target, TrendingUp, MapPin, Flame, Award, Zap, CheckCircle } from 'lucide-react';
+import { TrendingUp, MapPin, Flame, Award, Zap, CheckCircle } from 'lucide-react';
 
 interface MissionsProps {
   progress: UserProgress | null;

@@ -192,7 +192,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
 };
 
 const FieldError = styled.span`
-  color: ${props => props.theme.colors.error};
+  color: ${props => props.theme.colors.danger};
   font-size: 13px;
   font-weight: 500;
   margin-top: 4px;
@@ -419,7 +419,7 @@ const RemoveAttachment = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    background: ${props => props.theme.colors.error};
+    background: ${props => props.theme.colors.danger};
     color: white;
   }
 `;

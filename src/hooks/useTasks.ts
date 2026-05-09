@@ -27,6 +27,26 @@ export const useTasks = () => {
     fetchTasks();
   }, [user]);
 
+  const recalcLocations = async () => {
+    if (!user) return;
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('location')
+      .eq('user_id', user.id);
+    if (tasks) {
+      const uniqueLocations = new Set(
+        tasks.map(t => t.location).filter((l): l is string => Boolean(l))
+      );
+      await supabase
+        .from('user_progress')
+        .update({
+          total_locations: uniqueLocations.size,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+    }
+  };
+
   const addTask = async (
     title: string,
     urgency: 'baixa' | 'media' | 'alta',
@@ -37,16 +57,15 @@ export const useTasks = () => {
   ): Promise<{ success: boolean; errorMessage?: string }> => {
     if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
 
-    // Apenas colunas confirmadas na tabela tasks.
-    // Execute a migration SQL no Supabase para habilitar category, due_date, attachments.
     const insertPayload: Record<string, unknown> = {
       user_id: user.id,
       title,
       urgency,
       location,
+      category,
+      due_date: dueDate || null,
+      attachments,
     };
-
-    console.log('Inserindo tarefa:', JSON.stringify(insertPayload));
 
     const { data, error } = await supabase
       .from('tasks')
@@ -90,6 +109,7 @@ export const useTasks = () => {
 
     if (!error) {
       setTasks(prev => prev.filter(t => t.id !== taskId));
+      await recalcLocations();
     }
   };
 
@@ -106,48 +126,83 @@ export const useTasks = () => {
       console.error('Erro ao buscar progresso:', fetchError);
       return;
     }
+    if (!progress) return;
 
-    if (progress) {
-      const updates: Record<string, number | string> = {
-        updated_at: new Date().toISOString(),
-        last_activity: new Date().toISOString(),
-      };
+    const nowIso = new Date().toISOString();
+    const updates: Record<string, number | string> = {
+      updated_at: nowIso,
+      last_activity: nowIso,
+    };
 
-      if (action === 'task_created') {
-        updates.total_tasks_created = progress.total_tasks_created + 1;
-        updates.experience_points = progress.experience_points + 10;
+    let newXp = progress.experience_points;
+    let newCurrentStreak = progress.current_streak;
+    let newBestStreak = progress.best_streak;
 
-        if (location) {
-          const { data: tasks } = await supabase
-            .from('tasks')
-            .select('location')
-            .eq('user_id', user.id);
+    if (action === 'task_created') {
+      updates.total_tasks_created = progress.total_tasks_created + 1;
+      newXp += 10;
 
-          if (tasks) {
-            const uniqueLocations = new Set(tasks.map(t => t.location).filter(l => l));
-            updates.total_locations = uniqueLocations.size;
-          }
+      if (location) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('location')
+          .eq('user_id', user.id);
+
+        if (tasks) {
+          const uniqueLocations = new Set(
+            tasks.map(t => t.location).filter((l): l is string => Boolean(l))
+          );
+          updates.total_locations = uniqueLocations.size;
         }
-      } else if (action === 'task_completed') {
-        updates.total_tasks_completed = progress.total_tasks_completed + 1;
-        updates.experience_points = progress.experience_points + 50;
       }
+    } else if (action === 'task_completed') {
+      updates.total_tasks_completed = progress.total_tasks_completed + 1;
+      newXp += 50;
 
-      const newLevel = Math.floor(Number(updates.experience_points || progress.experience_points) / 500) + 1;
-      updates.level = newLevel;
+      // Streak: comparar dia da última atividade vs hoje (timezone local)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      const { error: updateError } = await supabase
-        .from('user_progress')
-        .update(updates)
-        .eq('user_id', user.id);
+      const last = progress.last_activity ? new Date(progress.last_activity) : null;
+      if (last) {
+        const lastDay = new Date(last);
+        lastDay.setHours(0, 0, 0, 0);
+        const diffDays = Math.round(
+          (today.getTime() - lastDay.getTime()) / 86400000
+        );
 
-      if (updateError) {
-        console.error('Erro ao atualizar progresso:', updateError);
+        if (diffDays === 0) {
+          // mesma janela diária — sem mudança no streak
+        } else if (diffDays === 1) {
+          newCurrentStreak += 1;
+        } else {
+          newCurrentStreak = 1;
+        }
+      } else {
+        newCurrentStreak = 1;
       }
+      newBestStreak = Math.max(newBestStreak, newCurrentStreak);
+      updates.current_streak = newCurrentStreak;
+      updates.best_streak = newBestStreak;
+    }
+
+    updates.experience_points = newXp;
+    updates.level = Math.floor(newXp / 500) + 1;
+
+    const { error: updateError } = await supabase
+      .from('user_progress')
+      .update(updates)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('Erro ao atualizar progresso:', updateError);
     }
   };
 
-  const updateTask = async (taskId: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => {
+  const updateTask = async (
+    taskId: string,
+    updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>
+  ) => {
     const { data, error } = await supabase
       .from('tasks')
       .update(updates)
@@ -157,6 +212,9 @@ export const useTasks = () => {
 
     if (!error && data) {
       setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+      if ('location' in updates) {
+        await recalcLocations();
+      }
     }
   };
 
@@ -173,7 +231,6 @@ export const useTasks = () => {
       }]);
 
     if (!error) {
-      // Atualizar shared_with na tarefa
       const task = tasks.find(t => t.id === taskId);
       if (task) {
         await supabase

@@ -3,7 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { Task } from '../lib/supabase';
 import {
   CheckCircle2, Circle, Trash2, MapPin, AlertCircle,
-  Pencil, Check, X, Clock, ChevronDown, ChevronUp, Flame
+  Pencil, Check, X, Clock, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 interface TaskListProps {
@@ -64,11 +64,11 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
   const [editTitle, setEditTitle] = useState(task.title);
   const [editUrgency, setEditUrgency] = useState<'baixa' | 'media' | 'alta'>(task.urgency);
   const [editLocation, setEditLocation] = useState(task.location || '');
-  const [editCategory, setEditCategory] = useState((task as any).category || '');
-  const [editDueDate, setEditDueDate] = useState((task as any).due_date ? new Date((task as any).due_date).toISOString().slice(0, 16) : '');
+  const [editCategory, setEditCategory] = useState(task.category || '');
+  const [editDueDate, setEditDueDate] = useState(task.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [checking, setChecking] = useState(false);
-  const { label: countdown, isOverdue } = useCountdown((task as any).due_date);
+  const { label: countdown, isOverdue } = useCountdown(task.due_date);
 
   const urgency = URGENCY_CONFIG[task.urgency] ?? URGENCY_CONFIG.media;
 
@@ -95,8 +95,8 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
     setEditTitle(task.title);
     setEditUrgency(task.urgency);
     setEditLocation(task.location || '');
-    setEditCategory((task as any).category || '');
-    setEditDueDate((task as any).due_date ? new Date((task as any).due_date).toISOString().slice(0, 16) : '');
+    setEditCategory(task.category || '');
+    setEditDueDate(task.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : '');
     setEditing(false);
   };
 
@@ -245,11 +245,11 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
               {new Date(task.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
             </DetailValue>
           </DetailRow>
-          {(task as any).due_date && (
+          {task.due_date && (
             <DetailRow>
               <DetailLabel>Vence em</DetailLabel>
               <DetailValue overdue={isOverdue}>
-                {new Date((task as any).due_date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                {new Date(task.due_date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                 {isOverdue && <OverdueTag>Vencida!</OverdueTag>}
               </DetailValue>
             </DetailRow>
@@ -262,10 +262,10 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit }: TaskCar
               </DetailValue>
             </DetailRow>
           )}
-          {(task as any).category && (
+          {task.category && (
             <DetailRow>
               <DetailLabel>Categoria</DetailLabel>
-              <DetailValue>{(task as any).category}</DetailValue>
+              <DetailValue>{task.category}</DetailValue>
             </DetailRow>
           )}
         </DetailPanel>

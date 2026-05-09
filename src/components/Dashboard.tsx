@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
 import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type } from 'lucide-react';
+import { Task } from '../lib/supabase';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
