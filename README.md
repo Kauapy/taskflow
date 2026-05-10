@@ -100,6 +100,7 @@ supabase/
    - `supabase/migrations/20260308191517_create_taskflow_schema.sql` — cria as tabelas `tasks` e `user_progress`, ativa RLS, cria políticas e o trigger que cria automaticamente o registro de progresso quando um usuário se cadastra.
    - `supabase/migrations/20260411100000_add_advanced_task_features.sql` — adiciona colunas `category`, `due_date`, `attachments`, `shared_with` e cria a tabela `task_shares`.
    - `supabase/migrations/20260509120000_add_profiles_and_sharing.sql` — cria a tabela `profiles` (espelho público de e-mails para lookup), trigger de backfill, RPCs `find_user_id_by_email` e `get_incoming_shares` (ambas SECURITY DEFINER), e novas políticas RLS para compartilhamento.
+   - `supabase/migrations/20260510140000_add_public_share_links.sql` — cria a tabela `task_share_links` (links públicos com token, validade opcional e contador de visualizações) e a RPC `get_shared_task_by_token` acessível a usuários **anônimos** (rota pública `/shared/:token`).
 4. (Opcional, durante desenvolvimento) Em **Authentication → Configuration**, desative “Confirm email” se quiser criar contas de teste sem confirmar e-mail.
 
 ## Scripts disponíveis
@@ -139,7 +140,7 @@ Todas as tabelas usam **Row Level Security**. Cada usuário só lê e escreve se
 - 🎮 Sistema de gamificação: XP por ação, nível calculado a partir de XP, missões com progresso visual
 - 🔥 Sequência (streak) de dias consecutivos completando tarefas
 - 📊 Dashboard analítico: progresso semanal e mensal (charts), taxa de produtividade, tempo médio de conclusão
-- 🤝 Compartilhamento de tarefas por e-mail, com fluxo aceitar/recusar
+- 🤝 Compartilhamento de tarefas por **e-mail** (com aceitar/recusar) **ou** por **link público** (qualquer pessoa, sem cadastro, com validade opcional e revogação)
 - 🌗 Tema claro/escuro com persistência em `localStorage`
 - 🔍 Busca em tempo real por título e localização
 - ⏱️ Contagem regressiva ao vivo para tarefas com data de vencimento

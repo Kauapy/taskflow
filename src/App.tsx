@@ -2,9 +2,24 @@ import styled, { keyframes } from 'styled-components';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import SharedTaskViewer from './components/SharedTaskViewer';
+
+// Roteamento mínimo: a rota /shared/:token é pública e independe do estado de auth.
+// Em vez de adicionar React Router (peso desnecessário p/ 1 rota), checamos o
+// pathname diretamente.
+function getSharedToken(): string | null {
+  const m = window.location.pathname.match(/^\/shared\/([A-Za-z0-9_-]+)\/?$/);
+  return m ? m[1] : null;
+}
 
 function App() {
+  const sharedToken = getSharedToken();
   const { user, loading } = useAuth();
+
+  // Página pública de tarefa compartilhada — renderiza sem precisar de auth.
+  if (sharedToken) {
+    return <SharedTaskViewer token={sharedToken} />;
+  }
 
   if (loading) {
     return (

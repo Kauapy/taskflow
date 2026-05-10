@@ -18,7 +18,11 @@ const Analytics = lazy(() => import('./Analytics'));
 const Dashboard = () => {
   const { signOut } = useAuth();
   const { toggleTheme, isDark, a11yZoom, toggleA11yZoom } = useTheme();
-  const { tasks, loading: tasksLoading, addTask, completeTask, deleteTask, updateTask, shareTask } = useTasks();
+  const {
+    tasks, loading: tasksLoading,
+    addTask, completeTask, deleteTask, updateTask, shareTask,
+    createShareLink, listShareLinks, revokeShareLink,
+  } = useTasks();
   const { progress, loading: progressLoading } = useProgress();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
@@ -191,6 +195,9 @@ const Dashboard = () => {
       <ShareTaskDialog
         task={sharingTask}
         onShare={shareTask}
+        onCreateLink={createShareLink}
+        onListLinks={listShareLinks}
+        onRevokeLink={revokeShareLink}
         onClose={() => setSharingTask(null)}
       />
     </Container>

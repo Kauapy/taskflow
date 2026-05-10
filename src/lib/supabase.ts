@@ -49,6 +49,30 @@ export interface IncomingShare {
   created_at: string;
 }
 
+export interface TaskShareLink {
+  id: string;
+  task_id: string;
+  token: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked: boolean;
+  view_count: number;
+}
+
+export interface SharedTaskView {
+  task_id: string;
+  title: string;
+  urgency: 'baixa' | 'media' | 'alta';
+  category: string;
+  location: string | null;
+  completed: boolean;
+  due_date: string | null;
+  created_at: string;
+  shared_by_email: string;
+  view_count: number;
+}
+
 export interface UserProgress {
   id: string;
   user_id: string;

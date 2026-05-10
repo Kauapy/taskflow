@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, Task } from '../lib/supabase';
+import { supabase, Task, TaskShareLink } from '../lib/supabase';
 import { applyStreakOnCompletion } from '../lib/streak';
 import { useAuth } from './useAuth';
 
@@ -268,6 +268,66 @@ export const useTasks = () => {
     return { success: true };
   };
 
+  /**
+   * Gera um link público para a tarefa. Retorna o token e a URL completa.
+   * `expiresInDays` opcional — se não passado, link não expira.
+   */
+  const createShareLink = async (
+    taskId: string,
+    expiresInDays?: number
+  ): Promise<{ success: boolean; link?: TaskShareLink; url?: string; errorMessage?: string }> => {
+    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
+
+    const payload: Record<string, unknown> = {
+      task_id: taskId,
+      created_by: user.id,
+    };
+    if (expiresInDays && expiresInDays > 0) {
+      const exp = new Date();
+      exp.setDate(exp.getDate() + expiresInDays);
+      payload.expires_at = exp.toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from('task_share_links')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, errorMessage: error.message };
+    }
+
+    const link = data as TaskShareLink;
+    const url = `${window.location.origin}/shared/${link.token}`;
+    return { success: true, link, url };
+  };
+
+  const listShareLinks = async (taskId: string): Promise<TaskShareLink[]> => {
+    if (!user) return [];
+    const { data, error } = await supabase
+      .from('task_share_links')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Erro ao listar share links:', error);
+      return [];
+    }
+    return (data as TaskShareLink[]) ?? [];
+  };
+
+  const revokeShareLink = async (
+    linkId: string
+  ): Promise<{ success: boolean; errorMessage?: string }> => {
+    const { error } = await supabase
+      .from('task_share_links')
+      .update({ revoked: true })
+      .eq('id', linkId);
+    if (error) return { success: false, errorMessage: error.message };
+    return { success: true };
+  };
+
   return {
     tasks,
     loading,
@@ -277,6 +337,9 @@ export const useTasks = () => {
     updateTask,
     shareTask,
     findUserIdByEmail,
+    createShareLink,
+    listShareLinks,
+    revokeShareLink,
     refetch: fetchTasks,
   };
 };

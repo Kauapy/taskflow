@@ -80,16 +80,40 @@ No canto superior direito ficam os controles de **acessibilidade** (tamanho de f
 
 ## 9. Compartilhar uma tarefa
 
+Há **dois modos** de compartilhar, oferecidos no mesmo modal em abas distintas:
+
+### 9.1 Por e-mail (usuário registrado)
+
 1. Em qualquer tarefa sua, clique no **ícone de compartilhar** (Share2).
-2. Um modal abre. Digite o **e-mail** de outro usuário **já cadastrado**.
-3. Clique em **"Compartilhar"**.
-4. Mensagens possíveis:
-   - ✅ **"Convite enviado!"** — sucesso, fim.
+2. Aba **"Por e-mail"** (padrão).
+3. Digite o **e-mail** de outro usuário **já cadastrado** no Taskflow.
+4. Clique em **"Compartilhar"**.
+5. Mensagens possíveis:
+   - ✅ **"Convite enviado!"** — sucesso. O destinatário vê em **Compartilhadas → Pendentes** e pode aceitar/recusar.
    - ❌ "Nenhum usuário cadastrado com esse e-mail."
    - ❌ "Você não pode compartilhar com você mesmo."
    - ❌ "Esta tarefa já foi compartilhada com esse usuário."
 
-> Capturar tela aqui → `docs/screenshots/04-compartilhar.png`
+### 9.2 Por link público (qualquer pessoa)
+
+Use quando o destinatário **não tem conta** no Taskflow, ou quando quiser distribuir em massa (WhatsApp, e-mail externo, redes sociais).
+
+1. No mesmo modal, clique na aba **"Por link público"**.
+2. Escolha a **validade** do link:
+   - *Sem expiração* (padrão) — vale até você revogar.
+   - *1, 7 ou 30 dias* — expira automaticamente.
+3. Clique em **"Gerar link"**.
+4. Um link tipo `https://app.taskflow.com/shared/<token>` aparece na lista.
+5. Clique em **Copiar** e envie por onde quiser.
+6. Cada link mostra:
+   - **Status**: Ativo / Expirado / Revogado.
+   - **Contador de visualizações** (atualiza a cada acesso).
+   - **Data de expiração** (se houver).
+7. Pode **revogar** a qualquer momento (botão lixeira) — o link para de funcionar imediatamente.
+
+> Quem abre o link vê uma página pública somente-leitura, sem precisar de login. Aparece um CTA "Criar minha conta no Taskflow" caso o visitante queira usar o app também.
+
+> Capturar telas aqui → `docs/screenshots/04a-compartilhar-email.png`, `docs/screenshots/04b-compartilhar-link.png`, `docs/screenshots/04c-pagina-publica.png`
 
 ## 10. Receber uma tarefa compartilhada
 

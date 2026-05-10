@@ -114,6 +114,32 @@ sequenceDiagram
   Note over DB: Nova policy SELECT em tasks:<br/>destinatário com share aceito vê a tarefa
 ```
 
+## Fluxo: link público
+
+```mermaid
+sequenceDiagram
+  actor A as Usuário A (dono)
+  participant App as React App
+  participant DB as Postgres
+  actor V as Visitante (anônimo)
+
+  A->>App: ShareTaskDialog → aba Link → Gerar
+  App->>DB: INSERT INTO task_share_links (token gerado pelo Postgres)
+  DB-->>App: {token, url, view_count: 0}
+  App->>A: mostra link, botão Copiar
+
+  V->>App: abre /shared/<token> (sem login)
+  Note over App: getSharedToken() detecta a rota<br/>renderiza SharedTaskViewer
+  App->>DB: rpc('get_shared_task_by_token', token)
+  Note over DB: SECURITY DEFINER<br/>1. Valida revoked/expires<br/>2. UPDATE view_count = +1<br/>3. JOIN tasks + profiles
+  DB-->>App: {title, urgency, location, email do dono, ...}
+  App->>V: página somente-leitura + CTA "Criar conta"
+
+  A->>App: clica Revogar
+  App->>DB: UPDATE task_share_links SET revoked=true
+  Note over DB: Próxima chamada da RPC<br/>retornará vazio → 404
+```
+
 ## Row Level Security — políticas em vigor
 
 | Tabela          | Operação       | Quem pode                                              |
@@ -128,11 +154,13 @@ sequenceDiagram
 | `task_shares`   | UPDATE         | apenas o destinatário (para aceitar)                   |
 | `task_shares`   | DELETE         | sharer (revogar) **OU** destinatário (recusar/remover) |
 | `profiles`      | SELECT         | apenas o próprio (cross-user via RPC SECURITY DEFINER) |
+| `task_share_links` | SELECT/INSERT/UPDATE/DELETE | apenas o dono (`created_by`); leitura pública via RPC |
 
 ## RPCs (`SECURITY DEFINER`)
 
 - **`find_user_id_by_email(text) → uuid`** — resolve e-mail para `user_id` sem expor a tabela `profiles` para outros usuários.
 - **`get_incoming_shares() → table`** — retorna em uma chamada todos os shares onde o caller é destinatário, com title/urgency/local da tarefa e o e-mail do sharer já resolvidos via JOIN no servidor (evita N+1).
+- **`get_shared_task_by_token(text) → table`** — valida um token de link público (não revogado, não expirado), incrementa o contador de visualizações e retorna a tarefa + e-mail do dono. Concedida a `anon` para permitir acesso **sem login**.
 
 ## Decisões arquiteturais
 

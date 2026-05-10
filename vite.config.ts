@@ -13,6 +13,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Restringe a busca apenas aos testes em src/. Sem isso, o Vitest
+    // varre worktrees do git (.claude/worktrees/) e roda testes duplicados.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
     env: {
       // Stubs para o cliente Supabase. createClient só valida que existem
       // strings; não há chamadas de rede nos testes (são mockadas/puras).
