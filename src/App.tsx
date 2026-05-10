@@ -1,5 +1,5 @@
 import styled, { keyframes } from 'styled-components';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 

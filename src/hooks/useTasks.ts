@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, Task } from '../lib/supabase';
 import { applyStreakOnCompletion } from '../lib/streak';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);

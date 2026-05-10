@@ -7,6 +7,7 @@ Gerenciador de tarefas pessoais com **gamificação** (XP, níveis, sequências/
 ## Sumário
 
 - [Visão geral](#visão-geral)
+- [Documentação acadêmica](#documentação-acadêmica)
 - [Tecnologias](#tecnologias)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Pré-requisitos](#pré-requisitos)
@@ -15,8 +16,19 @@ Gerenciador de tarefas pessoais com **gamificação** (XP, níveis, sequências/
 - [Scripts disponíveis](#scripts-disponíveis)
 - [Banco de dados](#banco-de-dados)
 - [Funcionalidades](#funcionalidades)
+- [Testes](#testes)
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Roadmap](#roadmap)
+
+## Documentação acadêmica
+
+| Documento | O que é |
+| --------- | ------- |
+| [docs/PROBLEMA.md](docs/PROBLEMA.md) | Problema, justificativa, público-alvo, objetivo geral, objetivos específicos, diferenciais, limitações |
+| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Visão geral, fluxos sequenciais, RLS, decisões arquiteturais (com diagramas Mermaid) |
+| [docs/ERD.md](docs/ERD.md) | Diagrama Entidade-Relacionamento, triggers, funções, índices, histórico de migrations |
+| [docs/MANUAL.md](docs/MANUAL.md) | Manual do usuário final |
+| [RELATORIO_TCC.md](RELATORIO_TCC.md) | Relatório técnico consolidado da revisão de TCC |
 
 ## Visão geral
 
@@ -233,8 +245,10 @@ Para rodar: `npm install -D @playwright/test && npx playwright install && npx pl
 - [x] UI completa de compartilhamento de tarefas
 - [x] Testes unitários e de componente (Vitest + Testing Library)
 - [x] CI no GitHub Actions
-- [ ] Testes E2E (Playwright) — esqueleto sugerido no README
-- [ ] Documentação acadêmica (problema, justificativa, ERD, diagramas)
+- [x] Documentação acadêmica (problema, justificativa, ERD, diagramas) — em `docs/`
+- [ ] Testes E2E (Playwright) — esqueleto sugerido neste README
+- [ ] Capturar e plugar screenshots em `docs/MANUAL.md`
+- [ ] Demo hospedada para a banca testar (Vercel/Netlify)
 
 ## Licença
 

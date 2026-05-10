@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, UserProgress } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 
 export const useProgress = () => {
   const [progress, setProgress] = useState<UserProgress | null>(null);

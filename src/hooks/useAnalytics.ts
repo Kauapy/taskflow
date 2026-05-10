@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { calculateAnalytics, AnalyticsData } from '../lib/analytics';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 
 export const useAnalytics = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);

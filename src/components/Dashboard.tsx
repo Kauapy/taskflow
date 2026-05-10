@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
 import styled from 'styled-components';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
 import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type, Inbox } from 'lucide-react';
