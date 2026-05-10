@@ -100,17 +100,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+#variable_conflict use_column
 DECLARE
   v_link_id uuid;
   v_task_id uuid;
   v_count integer;
 BEGIN
-  -- Valida o token: existe, não revogado, não expirado
-  SELECT id, task_id INTO v_link_id, v_task_id
-  FROM public.task_share_links
-  WHERE token = p_token
-    AND revoked = false
-    AND (expires_at IS NULL OR expires_at > now());
+  -- Valida o token: existe, não revogado, não expirado.
+  -- Aliases explícitos (tsl.) evitam ambiguidade com OUT params da TABLE.
+  SELECT tsl.id, tsl.task_id INTO v_link_id, v_task_id
+  FROM public.task_share_links tsl
+  WHERE tsl.token = p_token
+    AND tsl.revoked = false
+    AND (tsl.expires_at IS NULL OR tsl.expires_at > now());
 
   -- Token inválido → retorna vazio (cliente trata como 404)
   IF v_link_id IS NULL THEN
@@ -118,10 +120,10 @@ BEGIN
   END IF;
 
   -- Incrementa contador de visualizações e captura novo valor
-  UPDATE public.task_share_links
-  SET view_count = view_count + 1
-  WHERE id = v_link_id
-  RETURNING view_count INTO v_count;
+  UPDATE public.task_share_links AS tsl
+  SET view_count = tsl.view_count + 1
+  WHERE tsl.id = v_link_id
+  RETURNING tsl.view_count INTO v_count;
 
   -- Retorna a tarefa + e-mail do dono (via JOIN com profiles)
   RETURN QUERY
