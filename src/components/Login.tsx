@@ -2,7 +2,7 @@ import { useState } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { CheckCircle, AlertCircle, Sun, Moon, CheckSquare } from 'lucide-react';
+import { CheckCircle, AlertCircle, Sun, Moon, CheckSquare, Eye, EyeOff } from 'lucide-react';
 
 type Mode = 'login' | 'signup';
 
@@ -19,6 +19,9 @@ const Login = () => {
   const [signupPassword, setSignupPassword] = useState('');
   const [signupError, setSignupError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState('');
+
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -82,14 +85,27 @@ const Login = () => {
               disabled={submitting}
               autoComplete="email"
             />
-            <Input
-              type="password"
-              placeholder="Senha"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              disabled={submitting}
-              autoComplete="current-password"
-            />
+            <PasswordField>
+              <Input
+                type={showLoginPassword ? 'text' : 'password'}
+                placeholder="Senha"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                disabled={submitting}
+                autoComplete="current-password"
+              />
+              <PasswordToggle
+                type="button"
+                onClick={() => setShowLoginPassword(p => !p)}
+                aria-label={showLoginPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showLoginPassword}
+                title={showLoginPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showLoginPassword
+                  ? <EyeOff size={18} aria-hidden="true" />
+                  : <Eye size={18} aria-hidden="true" />}
+              </PasswordToggle>
+            </PasswordField>
 
             {loginError && (
               <Message type="error">
@@ -121,15 +137,28 @@ const Login = () => {
               disabled={submitting}
               autoComplete="email"
             />
-            <Input
-              type="password"
-              placeholder="Senha (mínimo 6 caracteres)"
-              value={signupPassword}
-              onChange={e => setSignupPassword(e.target.value)}
-              disabled={submitting}
-              autoComplete="new-password"
-              minLength={6}
-            />
+            <PasswordField>
+              <Input
+                type={showSignupPassword ? 'text' : 'password'}
+                placeholder="Senha (mínimo 6 caracteres)"
+                value={signupPassword}
+                onChange={e => setSignupPassword(e.target.value)}
+                disabled={submitting}
+                autoComplete="new-password"
+                minLength={6}
+              />
+              <PasswordToggle
+                type="button"
+                onClick={() => setShowSignupPassword(p => !p)}
+                aria-label={showSignupPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showSignupPassword}
+                title={showSignupPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showSignupPassword
+                  ? <EyeOff size={18} aria-hidden="true" />
+                  : <Eye size={18} aria-hidden="true" />}
+              </PasswordToggle>
+            </PasswordField>
 
             {signupError && (
               <Message type="error">
@@ -334,6 +363,7 @@ const FormTitle = styled.h2`
 `;
 
 const Input = styled.input`
+  width: 100%;
   padding: 12px 16px;
   border: 1.5px solid ${p => p.theme.colors.border};
   border-radius: 8px;
@@ -350,6 +380,39 @@ const Input = styled.input`
 
   &::placeholder { color: ${p => p.theme.colors.textSecondary}; }
   &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+
+const PasswordField = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  /* Espaço extra à direita do input para não cobrir texto digitado */
+  input { padding-right: 44px; }
+`;
+
+const PasswordToggle = styled.button`
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: ${p => p.theme.colors.textSecondary};
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover { color: ${p => p.theme.colors.primary}; background: ${p => p.theme.colors.surfaceHover}; }
+  &:focus-visible {
+    outline: 2px solid ${p => p.theme.colors.primary};
+    outline-offset: 1px;
+  }
 `;
 
 const PrimaryBtn = styled.button`
