@@ -1,32 +1,44 @@
 import { useState, lazy, Suspense } from 'react';
 import styled from 'styled-components';
+import { Search } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../hooks/useTheme';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
-import { LogOut, Sun, Moon, Search, Plus, BarChart3, CheckSquare, Type, Inbox } from 'lucide-react';
 import { Task } from '../lib/supabase';
+import Sidebar, { ViewId } from './Sidebar';
+import TopBar from './TopBar';
+import OnboardingPanel from './OnboardingPanel';
+import HomeView from './HomeView';
 import TaskList from './TaskList';
 import AddTask from './AddTask';
 import Missions from './Missions';
 import SharedTasks from './SharedTasks';
 import ShareTaskDialog from './ShareTaskDialog';
 
-// Lazy-load: o bundle do recharts (~200kB) só carrega quando o usuário abre a aba Análises.
+// Lazy-load: o bundle do recharts (~370kB) só carrega quando o usuário abre a aba Análises.
 const Analytics = lazy(() => import('./Analytics'));
 
+const VIEW_META: Record<ViewId, { title: string; subtitle?: string }> = {
+  home:      { title: 'Painel',          subtitle: 'Sua visão geral do dia' },
+  tasks:     { title: 'Tarefas',         subtitle: 'Gerencie suas atividades' },
+  missions:  { title: 'Missões',         subtitle: 'Desafios para subir de nível' },
+  shared:    { title: 'Compartilhadas',  subtitle: 'Tarefas que outros enviaram a você' },
+  analytics: { title: 'Análises',        subtitle: 'Estatísticas da sua produtividade' },
+};
+
 const Dashboard = () => {
-  const { signOut } = useAuth();
-  const { toggleTheme, isDark, a11yZoom, toggleA11yZoom } = useTheme();
+  const { user, signOut } = useAuth();
   const {
     tasks, loading: tasksLoading,
     addTask, completeTask, deleteTask, updateTask, shareTask,
     createShareLink, listShareLinks, revokeShareLink,
   } = useTasks();
   const { progress, loading: progressLoading } = useProgress();
+
+  const [view, setView] = useState<ViewId>('home');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'shared' | 'analytics'>('tasks');
   const [taskError, setTaskError] = useState<string | null>(null);
   const [sharingTask, setSharingTask] = useState<Task | null>(null);
 
@@ -37,13 +49,19 @@ const Dashboard = () => {
     task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     task.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   const filteredCompletedTasks = completedTasks.filter(task =>
     task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     task.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddTask = async (title: string, urgency: 'baixa' | 'media' | 'alta', location: string, category: string, dueDate?: string, attachments?: string[]) => {
+  const handleAddTask = async (
+    title: string,
+    urgency: 'baixa' | 'media' | 'alta',
+    location: string,
+    category: string,
+    dueDate?: string,
+    attachments?: string[]
+  ) => {
     setTaskError(null);
     const result = await addTask(title, urgency, location, category, dueDate, attachments);
     if (result?.success) {
@@ -53,143 +71,130 @@ const Dashboard = () => {
     }
   };
 
-  const handleEditTask = async (id: string, updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>) => {
+  const handleEditTask = async (
+    id: string,
+    updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>
+  ) => {
     await updateTask(id, updates);
   };
 
+  const handleQuickAdd = () => {
+    setView('tasks');
+    setShowAddTask(true);
+  };
+
+  const { title, subtitle } = VIEW_META[view];
+
   return (
-    <Container>
-      <Header>
-        <HeaderContent>
-          <Logo>
-            <h1>Taskflow</h1>
-          </Logo>
-
-          <Tabs>
-            <Tab active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')}>
-              <CheckSquare size={18} aria-hidden="true" />
-              Tarefas
-            </Tab>
-            <Tab active={activeTab === 'shared'} onClick={() => setActiveTab('shared')}>
-              <Inbox size={18} aria-hidden="true" />
-              Compartilhadas
-            </Tab>
-            <Tab active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')}>
-              <BarChart3 size={18} aria-hidden="true" />
-              Análises
-            </Tab>
-          </Tabs>
-
-          <HeaderActions>
-            <A11yToggle
-              onClick={toggleA11yZoom}
-              title={`Tamanho da fonte: ${a11yZoom === 1 ? 'Normal' : a11yZoom === 1.1 ? 'Médio' : 'Grande'}`}
-              aria-label={`Alterar tamanho da fonte (atual: ${a11yZoom === 1 ? 'normal' : a11yZoom === 1.1 ? 'médio' : 'grande'})`}
-            >
-              <Type size={20} aria-hidden="true" />
-              {a11yZoom > 1 && <ZoomBadge>{a11yZoom === 1.1 ? '+' : '++'}</ZoomBadge>}
-            </A11yToggle>
-            <ThemeToggle
-              onClick={toggleTheme}
-              title="Alternar tema"
-              aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-            >
-              {isDark ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
-            </ThemeToggle>
-            <LogoutButton onClick={signOut} title="Sair" aria-label="Sair da conta">
-              <LogOut size={20} aria-hidden="true" />
-            </LogoutButton>
-          </HeaderActions>
-        </HeaderContent>
-      </Header>
+    <Layout>
+      <Sidebar
+        active={view}
+        onChange={setView}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+      />
 
       <Main>
-        {activeTab === 'tasks' && (
-          <>
-            <Section>
-              <SectionHeader>
-                <h2>Missões</h2>
-              </SectionHeader>
+        <TopBar
+          title={title}
+          subtitle={subtitle}
+          userEmail={user?.email ?? ''}
+          onQuickAdd={handleQuickAdd}
+          onSignOut={signOut}
+        />
+
+        <ContentGrid>
+          <Center>
+            {view === 'home' && (
+              <HomeView
+                userEmail={user?.email ?? ''}
+                tasks={tasks}
+                progress={progress}
+                onCreateTask={handleQuickAdd}
+                onViewTasks={() => setView('tasks')}
+              />
+            )}
+
+            {view === 'tasks' && (
+              <TasksWrap>
+                <TasksHeader>
+                  <SearchBar>
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar tarefas…"
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      aria-label="Pesquisar tarefas"
+                    />
+                  </SearchBar>
+                </TasksHeader>
+
+                {taskError && (
+                  <ErrorBanner>
+                    <strong>Erro ao criar tarefa:</strong> {taskError}
+                  </ErrorBanner>
+                )}
+
+                {showAddTask && (
+                  <AddTask
+                    onAdd={handleAddTask}
+                    onCancel={() => { setShowAddTask(false); setTaskError(null); }}
+                  />
+                )}
+
+                <TasksGrid>
+                  <TasksColumn>
+                    <ColumnTitle>Ativas ({filteredActiveTasks.length})</ColumnTitle>
+                    <TaskList
+                      tasks={filteredActiveTasks}
+                      onComplete={completeTask}
+                      onDelete={deleteTask}
+                      onEdit={handleEditTask}
+                      onShare={setSharingTask}
+                      loading={tasksLoading}
+                    />
+                  </TasksColumn>
+                  <TasksColumn>
+                    <ColumnTitle>Concluídas ({filteredCompletedTasks.length})</ColumnTitle>
+                    <TaskList
+                      tasks={filteredCompletedTasks}
+                      onComplete={completeTask}
+                      onDelete={deleteTask}
+                      onEdit={handleEditTask}
+                      onShare={setSharingTask}
+                      loading={tasksLoading}
+                      completed
+                    />
+                  </TasksColumn>
+                </TasksGrid>
+              </TasksWrap>
+            )}
+
+            {view === 'missions' && (
               <Missions progress={progress} loading={progressLoading} />
-            </Section>
+            )}
 
-            <Section>
-              <SectionHeader>
-                <h2>Tarefas</h2>
-                <AddButton onClick={() => setShowAddTask(true)}>
-                  <Plus size={20} aria-hidden="true" />
-                  Nova Tarefa
-                </AddButton>
-              </SectionHeader>
+            {view === 'shared' && <SharedTasks />}
 
-              <SearchBar>
-                <Search size={20} aria-hidden="true" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar tarefas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  aria-label="Pesquisar tarefas"
-                />
-              </SearchBar>
+            {view === 'analytics' && (
+              <Suspense fallback={<LoadingHint>Carregando análises…</LoadingHint>}>
+                <Analytics />
+              </Suspense>
+            )}
+          </Center>
 
-              {taskError && (
-                <ErrorBanner>
-                  <strong>Erro ao criar tarefa:</strong> {taskError}
-                </ErrorBanner>
-              )}
-
-              {showAddTask && (
-                <AddTask
-                  onAdd={handleAddTask}
-                  onCancel={() => { setShowAddTask(false); setTaskError(null); }}
-                />
-              )}
-
-              <TasksContainer>
-                <TaskSection>
-                  <TaskSectionTitle>Ativas ({filteredActiveTasks.length})</TaskSectionTitle>
-                  <TaskList
-                    tasks={filteredActiveTasks}
-                    onComplete={completeTask}
-                    onDelete={deleteTask}
-                    onEdit={handleEditTask}
-                    onShare={setSharingTask}
-                    loading={tasksLoading}
-                  />
-                </TaskSection>
-
-                <TaskSection>
-                  <TaskSectionTitle>Concluídas ({filteredCompletedTasks.length})</TaskSectionTitle>
-                  <TaskList
-                    tasks={filteredCompletedTasks}
-                    onComplete={completeTask}
-                    onDelete={deleteTask}
-                    onEdit={handleEditTask}
-                    onShare={setSharingTask}
-                    loading={tasksLoading}
-                    completed
-                  />
-                </TaskSection>
-              </TasksContainer>
-            </Section>
-          </>
-        )}
-
-        {activeTab === 'shared' && (
-          <Section>
-            <SectionHeader>
-              <h2>Compartilhadas comigo</h2>
-            </SectionHeader>
-            <SharedTasks />
-          </Section>
-        )}
-
-        {activeTab === 'analytics' && (
-          <Suspense fallback={<TaskSectionTitle>Carregando análises…</TaskSectionTitle>}>
-            <Analytics />
-          </Suspense>
-        )}
+          {/* Painel direito — visível em todas as views, exceto missões (onde já é o foco) */}
+          {view !== 'missions' && (
+            <RightCol>
+              <OnboardingPanel
+                progress={progress}
+                tasks={tasks}
+                onNavigate={setView}
+              />
+            </RightCol>
+          )}
+        </ContentGrid>
       </Main>
 
       <ShareTaskDialog
@@ -200,255 +205,135 @@ const Dashboard = () => {
         onRevokeLink={revokeShareLink}
         onClose={() => setSharingTask(null)}
       />
-    </Container>
+    </Layout>
   );
 };
 
-const Container = styled.div`
+// ──────────────────────────────────────────────────────── styled
+
+const Layout = styled.div`
+  display: flex;
   min-height: 100vh;
-  background: ${props => props.theme.colors.background};
+  background: ${p => p.theme.colors.background};
 `;
 
-const Header = styled.header`
-  background: ${props => props.theme.colors.surface};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
-  box-shadow: 0 2px 8px ${props => props.theme.colors.shadow};
-  position: sticky;
-  top: 0;
-  z-index: 100;
-`;
-
-const HeaderContent = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const Logo = styled.div`
-  h1 {
-    font-size: 28px;
-    font-weight: 700;
-    background: linear-gradient(135deg, ${props => props.theme.colors.primary} 0%, ${props => props.theme.colors.secondary} 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-`;
-
-const HeaderActions = styled.div`
-  display: flex;
-  gap: 12px;
-`;
-
-const ThemeToggle = styled.button`
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.primary};
-  border: 2px solid ${props => props.theme.colors.border};
-  border-radius: 10px;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: ${props => props.theme.colors.primary};
-    color: white;
-    transform: scale(1.05);
-  }
-`;
-
-const A11yToggle = styled.button`
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.primary};
-  border: 2px solid ${props => props.theme.colors.border};
-  border-radius: 10px;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: ${props => props.theme.colors.primary};
-    color: white;
-    transform: scale(1.05);
-  }
-`;
-
-const ZoomBadge = styled.span`
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: ${props => props.theme.colors.success};
-  color: white;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 4px;
-  border-radius: 8px;
-  line-height: 1;
-`;
-
-const LogoutButton = styled.button`
-  background: ${props => props.theme.colors.danger};
-  color: white;
-  border-radius: 10px;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-
-  &:hover {
-    opacity: 0.9;
-    transform: scale(1.05);
-  }
-`;
-
-const Main = styled.main`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 24px;
+const Main = styled.div`
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 32px;
 `;
 
-const Section = styled.section`
-  background: ${props => props.theme.colors.surface};
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 2px 12px ${props => props.theme.colors.shadow};
-  border: 1px solid ${props => props.theme.colors.border};
-`;
+const ContentGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 28px;
+  padding: 28px;
+  flex: 1;
+  align-items: start;
 
-const SectionHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
 
-  h2 {
-    font-size: 24px;
-    font-weight: 700;
-    color: ${props => props.theme.colors.text};
+  @media (max-width: 720px) {
+    padding: 16px;
+    gap: 16px;
   }
 `;
 
-const AddButton = styled.button`
-  background: ${props => props.theme.colors.primary};
-  color: white;
-  padding: 10px 20px;
-  border-radius: 10px;
+const Center = styled.section`
+  min-width: 0;
+`;
+
+const RightCol = styled.div`
+  position: sticky;
+  top: 28px;
+
+  @media (max-width: 1100px) {
+    position: static;
+  }
+`;
+
+const TasksWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
+const TasksHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 15px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: ${props => props.theme.colors.primaryDark};
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px ${props => props.theme.colors.primary}66;
-  }
+  gap: 12px;
+  flex-wrap: wrap;
 `;
 
 const SearchBar = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: ${props => props.theme.colors.background};
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 2px solid ${props => props.theme.colors.border};
-  margin-bottom: 24px;
-  transition: all 0.2s ease;
+  gap: 10px;
+  flex: 1;
+  min-width: 220px;
+  background: ${p => p.theme.colors.surface};
+  border: 1px solid ${p => p.theme.colors.border};
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: ${p => p.theme.colors.textSecondary};
 
   &:focus-within {
-    border-color: ${props => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
-  }
-
-  svg {
-    color: ${props => props.theme.colors.textSecondary};
+    border-color: ${p => p.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${p => p.theme.colors.primary}22;
   }
 
   input {
     flex: 1;
     border: none;
     background: transparent;
-    color: ${props => props.theme.colors.text};
-    font-size: 15px;
+    color: ${p => p.theme.colors.text};
+    font-size: 14px;
+    outline: none;
 
-    &::placeholder {
-      color: ${props => props.theme.colors.textSecondary};
-    }
-  }
-`;
-
-const TasksContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const TaskSection = styled.div``;
-
-const TaskSectionTitle = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.textSecondary};
-  margin-bottom: 16px;
-`;
-const Tabs = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const Tab = styled.button<{ active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
-  color: ${props => props.active ? 'white' : props.theme.colors.textSecondary};
-  border: 1px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
-
-  &:hover {
-    background: ${props => props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
+    &::placeholder { color: ${p => p.theme.colors.textSecondary}; }
   }
 `;
 
 const ErrorBanner = styled.div`
-  background: #fee2e2;
-  border: 1.5px solid #f87171;
-  border-radius: 10px;
-  color: #b91c1c;
-  padding: 12px 16px;
-  font-size: 14px;
-  margin-bottom: 12px;
+  background: ${p => p.theme.colors.danger}18;
+  border: 1px solid ${p => p.theme.colors.danger}55;
+  border-radius: 8px;
+  color: ${p => p.theme.colors.danger};
+  padding: 10px 14px;
+  font-size: 13px;
 
-  strong {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 15px;
+  strong { display: block; margin-bottom: 2px; font-size: 13px; }
+`;
+
+const TasksGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
   }
+`;
+
+const TasksColumn = styled.div``;
+
+const ColumnTitle = styled.h3`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${p => p.theme.colors.textSecondary};
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 12px;
+`;
+
+const LoadingHint = styled.p`
+  font-size: 14px;
+  color: ${p => p.theme.colors.textSecondary};
+  text-align: center;
+  padding: 40px;
 `;
 
 export default Dashboard;
