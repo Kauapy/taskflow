@@ -20,21 +20,6 @@ export interface Task {
   shared_with: string[]; // Array de user_ids
 }
 
-export interface TaskShare {
-  id: string;
-  task_id: string;
-  shared_by: string;
-  shared_with: string;
-  status: 'pending' | 'accepted' | 'declined';
-  created_at: string;
-}
-
-export interface Profile {
-  id: string;
-  email: string;
-  created_at: string;
-}
-
 export interface IncomingShare {
   id: string;                                   // task_share id
   task_id: string;

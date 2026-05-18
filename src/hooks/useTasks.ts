@@ -336,7 +336,6 @@ export const useTasks = () => {
     deleteTask,
     updateTask,
     shareTask,
-    findUserIdByEmail,
     createShareLink,
     listShareLinks,
     revokeShareLink,
