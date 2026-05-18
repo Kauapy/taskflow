@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import styled from 'styled-components';
-import { X } from 'lucide-react';
+import { X, Paperclip, Upload } from 'lucide-react';
+import { uploadAttachment, deleteAttachment, pathFromPublicUrl } from '../lib/storage';
+import { useAuth } from '../hooks/useAuth';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+interface AttachedFile {
+  url: string;
+  name: string;
+  size: number;
+  uploading: boolean;
+}
 
 interface AddTaskProps {
   onAdd: (title: string, urgency: 'baixa' | 'media' | 'alta', location: string, category: string, dueDate?: string, attachments?: string[]) => void;
@@ -8,18 +19,20 @@ interface AddTaskProps {
 }
 
 const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [title, setTitle] = useState('');
   const [urgency, setUrgency] = useState<'baixa' | 'media' | 'alta'>('media');
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [files, setFiles] = useState<AttachedFile[]>([]);
   const [attachmentError, setAttachmentError] = useState<string>('');
   const [errors, setErrors] = useState<{ title?: string; date?: string; location?: string }>({});
 
   const TITLE_MAX = 200;
   const LOCATION_MAX = 100;
-  const SAFE_URL_SCHEMES = new Set(['http:', 'https:']);
 
   const getLocalMinDate = () => {
     const now = new Date();
@@ -27,12 +40,55 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
     return now.toISOString().slice(0, 16);
   };
 
-  const isSafeUrl = (raw: string): boolean => {
-    try {
-      const u = new URL(raw);
-      return SAFE_URL_SCHEMES.has(u.protocol);
-    } catch {
-      return false;
+  const handleFiles = async (picked: FileList | null) => {
+    if (!picked || !user) return;
+    setAttachmentError('');
+
+    for (const file of Array.from(picked)) {
+      if (file.size > MAX_FILE_SIZE) {
+        setAttachmentError(`"${file.name}" excede 10 MB.`);
+        continue;
+      }
+
+      // Placeholder enquanto o upload acontece
+      const placeholder: AttachedFile = {
+        url: '', name: file.name, size: file.size, uploading: true,
+      };
+      setFiles(prev => [...prev, placeholder]);
+
+      const { data, error } = await uploadAttachment(file, user.id);
+
+      setFiles(prev => {
+        const idx = prev.findIndex(
+          f => f.uploading && f.name === file.name && f.size === file.size
+        );
+        if (idx === -1) return prev;
+        const copy = [...prev];
+        if (error || !data) {
+          // remove o placeholder em caso de erro
+          copy.splice(idx, 1);
+        } else {
+          copy[idx] = { url: data.url, name: data.name, size: data.size, uploading: false };
+        }
+        return copy;
+      });
+
+      if (error) {
+        setAttachmentError(`Falha ao enviar "${file.name}": ${error}`);
+      }
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = async (idx: number) => {
+    const target = files[idx];
+    if (!target) return;
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+    // Best-effort: apaga do Storage também
+    if (target.url) {
+      const path = pathFromPublicUrl(target.url);
+      if (path) await deleteAttachment(path);
     }
   };
 
@@ -67,13 +123,20 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
       return;
     }
 
-    onAdd(trimmedTitle, urgency, location.trim(), category, dueDate || undefined, attachments);
+    if (files.some(f => f.uploading)) {
+      setAttachmentError('Aguarde o upload terminar antes de salvar.');
+      return;
+    }
+
+    const urls = files.filter(f => f.url).map(f => f.url);
+    onAdd(trimmedTitle, urgency, location.trim(), category, dueDate || undefined, urls);
     setTitle('');
     setUrgency('media');
     setLocation('');
     setCategory('');
     setDueDate('');
-    setAttachments([]);
+    setFiles([]);
+    setAttachmentError('');
   };
 
   return (
@@ -170,35 +233,42 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
         </FormGroup>
 
         <FormGroup>
-          <Label>Anexos (URLs, opcional)</Label>
-          <Input
-            type="text"
-            placeholder="Cole uma URL http(s) e pressione Enter"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                const target = e.target as HTMLInputElement;
-                const url = target.value.trim();
-                if (!url) return;
-                if (!isSafeUrl(url)) {
-                  setAttachmentError('Apenas URLs http:// ou https:// são aceitas.');
-                  return;
-                }
-                setAttachmentError('');
-                setAttachments(prev => [...prev, url]);
-                target.value = '';
-              }
-            }}
+          <Label>Anexos (opcional)</Label>
+          <FileButton
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Selecionar arquivos para anexar"
+          >
+            <Upload size={16} aria-hidden="true" />
+            Selecionar arquivos
+          </FileButton>
+          <HiddenFileInput
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={e => handleFiles(e.target.files)}
+            aria-label="Selecionar arquivos para anexar"
           />
+          <FileHint>
+            Qualquer tipo de arquivo, até 10 MB cada. Os arquivos ficam acessíveis
+            por link público.
+          </FileHint>
           {attachmentError && <FieldError>{attachmentError}</FieldError>}
-          {attachments.length > 0 && (
+          {files.length > 0 && (
             <AttachmentsList>
-              {attachments.map((url, index) => (
-                <AttachmentItem key={index}>
-                  {url}
+              {files.map((file, index) => (
+                <AttachmentItem key={`${file.url || file.name}-${index}`}>
+                  <FileMeta>
+                    <Paperclip size={14} aria-hidden="true" />
+                    <FileName title={file.name}>{file.name}</FileName>
+                    <FileSize>{(file.size / 1024).toFixed(1)} KB</FileSize>
+                    {file.uploading && <UploadingTag>enviando…</UploadingTag>}
+                  </FileMeta>
                   <RemoveAttachment
-                    onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
-                    aria-label={`Remover anexo ${url}`}
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    aria-label={`Remover anexo ${file.name}`}
+                    disabled={file.uploading}
                   >
                     <X size={14} aria-hidden="true" />
                   </RemoveAttachment>
@@ -436,6 +506,39 @@ const AttachmentItem = styled.div`
   border-radius: 6px;
   font-size: 14px;
   color: ${props => props.theme.colors.textSecondary};
+  gap: 8px;
+`;
+
+const FileMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+
+  svg { flex-shrink: 0; }
+`;
+
+const FileName = styled.span`
+  font-size: 13px;
+  color: ${p => p.theme.colors.text};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+`;
+
+const FileSize = styled.span`
+  font-size: 11px;
+  color: ${p => p.theme.colors.textSecondary};
+  flex-shrink: 0;
+`;
+
+const UploadingTag = styled.span`
+  font-size: 11px;
+  color: ${p => p.theme.colors.primary};
+  font-weight: 600;
+  flex-shrink: 0;
 `;
 
 const RemoveAttachment = styled.button`
@@ -444,14 +547,55 @@ const RemoveAttachment = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
+  padding: 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${props => props.theme.colors.danger};
     color: white;
   }
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
+const FileButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1.5px dashed ${p => p.theme.colors.border};
+  border-radius: 10px;
+  background: ${p => p.theme.colors.background};
+  color: ${p => p.theme.colors.textSecondary};
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: fit-content;
+
+  &:hover {
+    color: ${p => p.theme.colors.primary};
+    border-color: ${p => p.theme.colors.primary};
+    background: ${p => p.theme.colors.surface};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${p => p.theme.colors.primary};
+    outline-offset: 2px;
+  }
+`;
+
+const HiddenFileInput = styled.input`
+  display: none;
+`;
+
+const FileHint = styled.p`
+  font-size: 12px;
+  color: ${p => p.theme.colors.textSecondary};
+  line-height: 1.4;
+  margin-top: 2px;
 `;
 
 export default AddTask;

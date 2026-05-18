@@ -3,9 +3,10 @@ import styled, { keyframes, css } from 'styled-components';
 import { Task } from '../lib/supabase';
 import {
   CheckCircle2, Circle, Trash2, MapPin, AlertCircle,
-  Pencil, Check, X, Clock, ChevronDown, ChevronUp, Share2
+  Pencil, Check, X, Clock, ChevronDown, ChevronUp, Share2, Paperclip
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import { nameFromPublicUrl } from '../lib/storage';
 
 interface TaskListProps {
   tasks: Task[];
@@ -296,6 +297,25 @@ const TaskCardItem = ({ task, completed, onComplete, onDelete, onEdit, onShare }
             <DetailRow>
               <DetailLabel>Categoria</DetailLabel>
               <DetailValue>{task.category}</DetailValue>
+            </DetailRow>
+          )}
+          {task.attachments && task.attachments.length > 0 && (
+            <DetailRow>
+              <DetailLabel>Anexos ({task.attachments.length})</DetailLabel>
+              <AttachmentsList>
+                {task.attachments.map((url, i) => (
+                  <AttachmentLink
+                    key={`${url}-${i}`}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={url}
+                  >
+                    <Paperclip size={11} aria-hidden="true" />
+                    {nameFromPublicUrl(url)}
+                  </AttachmentLink>
+                ))}
+              </AttachmentsList>
             </DetailRow>
           )}
         </DetailPanel>
@@ -687,6 +707,35 @@ const EmptyState = styled.div`
 const EmptyIcon = styled.span`
   font-size: 40px;
   line-height: 1;
+`;
+
+const AttachmentsList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+`;
+
+const AttachmentLink = styled.a`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: ${p => p.theme.colors.surface};
+  color: ${p => p.theme.colors.primary};
+  text-decoration: none;
+  border: 1px solid ${p => p.theme.colors.border};
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.15s;
+
+  &:hover {
+    background: ${p => p.theme.colors.primary}18;
+    border-color: ${p => p.theme.colors.primary};
+  }
 `;
 
 export default TaskList;

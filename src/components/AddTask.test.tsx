@@ -4,6 +4,26 @@ import { ThemeProvider } from 'styled-components';
 import { lightTheme } from '../styles/theme';
 import AddTask from './AddTask';
 
+// Mock useAuth porque o AddTask precisa do user.id para o upload.
+// Em testes não há sessão Supabase, então fornecemos um usuário fake.
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 'test-user-id', email: 'test@example.com' },
+    loading: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
+// Mock o lib/storage para não tentar chamar Supabase Storage em testes
+vi.mock('../lib/storage', () => ({
+  uploadAttachment: vi.fn(async () => ({ data: null, error: 'mocked' })),
+  deleteAttachment: vi.fn(async () => ({ error: null })),
+  nameFromPublicUrl: (u: string) => u,
+  pathFromPublicUrl: () => null,
+}));
+
 const wrap = (ui: React.ReactNode) =>
   render(<ThemeProvider theme={lightTheme}>{ui}</ThemeProvider>);
 
@@ -34,15 +54,13 @@ describe('<AddTask />', () => {
     );
   });
 
-  it('rejeita anexo quando a URL não é http(s)', () => {
+  it('expõe um botão para selecionar arquivos como anexo', () => {
     wrap(<AddTask onAdd={() => {}} onCancel={() => {}} />);
-    const input = screen.getByPlaceholderText(/Cole uma URL/i);
-    fireEvent.keyDown(input, { key: 'Enter' });
-    fireEvent.change(input, { target: { value: 'javascript:alert(1)' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
     expect(
-      screen.getByText(/Apenas URLs http:\/\/ ou https:\/\/ são aceitas/i)
+      screen.getByRole('button', { name: /Selecionar arquivos/i })
     ).toBeInTheDocument();
+    // Dica menciona o limite de 10 MB
+    expect(screen.getByText(/10 MB/i)).toBeInTheDocument();
   });
 
   it('chama onCancel ao clicar em Fechar (X)', () => {
