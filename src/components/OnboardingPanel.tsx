@@ -1,9 +1,13 @@
 import styled from 'styled-components';
 import {
-  Award, Zap, Flame, CheckCircle2, Circle, ChevronRight, Target,
+  Award, Zap, Flame, ChevronRight, Target, ListPlus, CheckCircle2,
+  Share2, Star,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Task, UserProgress } from '../lib/supabase';
-import { computeOnboarding, onboardingCompletion } from '../lib/onboarding';
+import {
+  computeOnboarding, onboardingCompletion, OnboardingSlotId,
+} from '../lib/onboarding';
 import type { ViewId } from './Sidebar';
 
 interface OnboardingPanelProps {
@@ -11,6 +15,14 @@ interface OnboardingPanelProps {
   tasks: Task[];
   onNavigate: (view: ViewId) => void;
 }
+
+const SLOT_ICON: Record<OnboardingSlotId, LucideIcon> = {
+  create: ListPlus,
+  complete: CheckCircle2,
+  streak: Flame,
+  xp: Zap,
+  share: Share2,
+};
 
 const OnboardingPanel = ({ progress, tasks, onNavigate }: OnboardingPanelProps) => {
   const steps = computeOnboarding(progress, tasks);
@@ -22,7 +34,6 @@ const OnboardingPanel = ({ progress, tasks, onNavigate }: OnboardingPanelProps) 
 
   return (
     <Panel aria-label="Painel de progresso">
-      {/* Bloco de gamificação compacto */}
       <Stats>
         <StatCard>
           <StatIcon><Award size={14} aria-hidden="true" /></StatIcon>
@@ -41,52 +52,62 @@ const OnboardingPanel = ({ progress, tasks, onNavigate }: OnboardingPanelProps) 
         </StatCard>
       </Stats>
 
-      {/* Checklist de primeiros passos */}
       <Section>
         <SectionHeader>
-          <h3>Primeiros passos</h3>
-          <Counter>{completion.done}/{completion.total}</Counter>
+          <h3>Missões ativas</h3>
+          {completion.maxed > 0 && (
+            <MaxedBadge title={`${completion.maxed} de ${completion.total} cadeias completas`}>
+              <Star size={11} aria-hidden="true" />
+              {completion.maxed}/{completion.total}
+            </MaxedBadge>
+          )}
         </SectionHeader>
-        <ProgressBar>
-          <ProgressFill percentage={completion.percentage} />
-        </ProgressBar>
 
         <Checklist>
-          {steps.map(step => (
-            <StepItem
-              key={step.id}
-              type="button"
-              done={step.done}
-              onClick={() => !step.done && onNavigate(step.cta)}
-              disabled={step.done}
-              aria-label={`${step.title} - ${step.done ? 'concluído' : 'pendente'}`}
-            >
-              <StepIcon done={step.done}>
-                {step.done
-                  ? <CheckCircle2 size={16} aria-hidden="true" />
-                  : <Circle size={16} aria-hidden="true" />}
-              </StepIcon>
-              <StepText>
-                <StepTitle done={step.done}>{step.title}</StepTitle>
-                <StepDesc>{step.description}</StepDesc>
-              </StepText>
-              {!step.done && <ChevronRight size={14} aria-hidden="true" />}
-            </StepItem>
-          ))}
+          {steps.map(step => {
+            const Icon = SLOT_ICON[step.slotId];
+            const pct = step.target === 0
+              ? 100
+              : Math.min(100, (step.current / step.target) * 100);
+            return (
+              <StepItem
+                key={step.slotId}
+                type="button"
+                maxed={step.isMaxed}
+                onClick={() => !step.isMaxed && onNavigate(step.cta)}
+                disabled={step.isMaxed}
+                aria-label={`${step.title} - ${step.current} de ${step.target} (nível ${step.level}/${step.total})`}
+              >
+                <StepIcon maxed={step.isMaxed}>
+                  <Icon size={14} aria-hidden="true" />
+                </StepIcon>
+                <StepBody>
+                  <StepHead>
+                    <StepTitle maxed={step.isMaxed}>{step.title}</StepTitle>
+                    <StepCounter maxed={step.isMaxed}>
+                      {step.isMaxed ? '✓' : `${formatNum(step.current)}/${formatNum(step.target)}`}
+                    </StepCounter>
+                  </StepHead>
+                  <StepDesc>{step.description}</StepDesc>
+                  <StepBar>
+                    <StepFill percentage={pct} maxed={step.isMaxed} />
+                  </StepBar>
+                  <StepLevel>
+                    {step.isMaxed
+                      ? 'Cadeia completa'
+                      : `Nível ${step.level} de ${step.total}`}
+                  </StepLevel>
+                </StepBody>
+                {!step.isMaxed && (
+                  <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0, opacity: 0.5 }} />
+                )}
+              </StepItem>
+            );
+          })}
         </Checklist>
-
-        {completion.done === completion.total && (
-          <CompletedMsg>
-            🎉 Você concluiu os primeiros passos!
-          </CompletedMsg>
-        )}
       </Section>
 
-      {/* Link para todas as missões */}
-      <MissionsLink
-        type="button"
-        onClick={() => onNavigate('missions')}
-      >
+      <MissionsLink type="button" onClick={() => onNavigate('missions')}>
         <Target size={14} aria-hidden="true" />
         <span>Ver todas as missões</span>
         <ChevronRight size={14} aria-hidden="true" />
@@ -94,6 +115,8 @@ const OnboardingPanel = ({ progress, tasks, onNavigate }: OnboardingPanelProps) 
     </Panel>
   );
 };
+
+const formatNum = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k`.replace('.0', '') : `${n}`);
 
 // ──────────────────────────────────────────────────────── styled
 
@@ -158,58 +181,45 @@ const SectionHeader = styled.div`
     font-size: 13px;
     font-weight: 600;
     color: ${p => p.theme.colors.text};
-    letter-spacing: 0.1px;
   }
 `;
 
-const Counter = styled.span`
-  font-size: 11px;
+const MaxedBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
   font-weight: 700;
-  color: ${p => p.theme.colors.textSecondary};
-  background: ${p => p.theme.colors.background};
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid ${p => p.theme.colors.border};
-`;
-
-const ProgressBar = styled.div`
-  width: 100%;
-  height: 4px;
-  background: ${p => p.theme.colors.background};
-  border-radius: 999px;
-  overflow: hidden;
-`;
-
-const ProgressFill = styled.div<{ percentage: number }>`
-  height: 100%;
-  width: ${p => p.percentage}%;
-  background: ${p => p.theme.colors.primary};
-  border-radius: 999px;
-  transition: width 0.3s ease;
+  background: ${p => p.theme.colors.warning}22;
+  color: ${p => p.theme.colors.warning};
+  border: 1px solid ${p => p.theme.colors.warning}55;
 `;
 
 const Checklist = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 4px;
 `;
 
-const StepItem = styled.button<{ done: boolean }>`
+const StepItem = styled.button<{ maxed: boolean }>`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 10px 8px;
-  border: none;
-  background: transparent;
+  padding: 10px;
+  border: 1px solid ${p => p.theme.colors.border};
+  background: ${p => p.theme.colors.background};
   border-radius: 8px;
   text-align: left;
   width: 100%;
-  cursor: ${p => (p.done ? 'default' : 'pointer')};
-  transition: background 0.15s;
+  cursor: ${p => (p.maxed ? 'default' : 'pointer')};
+  transition: all 0.15s;
+  opacity: ${p => (p.maxed ? 0.75 : 1)};
 
   &:hover:not(:disabled) {
-    background: ${p => p.theme.colors.background};
+    border-color: ${p => p.theme.colors.primary};
+    background: ${p => p.theme.colors.surface};
   }
 
   &:focus-visible {
@@ -218,39 +228,75 @@ const StepItem = styled.button<{ done: boolean }>`
   }
 `;
 
-const StepIcon = styled.div<{ done: boolean }>`
+const StepIcon = styled.div<{ maxed: boolean }>`
   flex-shrink: 0;
-  color: ${p => (p.done ? p.theme.colors.success : p.theme.colors.textSecondary)};
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${p => (p.maxed ? p.theme.colors.warning + '22' : p.theme.colors.primary + '22')};
+  color: ${p => (p.maxed ? p.theme.colors.warning : p.theme.colors.primary)};
 `;
 
-const StepText = styled.div`
+const StepBody = styled.div`
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 `;
 
-const StepTitle = styled.div<{ done: boolean }>`
+const StepHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+`;
+
+const StepTitle = styled.div<{ maxed: boolean }>`
   font-size: 12px;
   font-weight: 600;
   color: ${p => p.theme.colors.text};
-  text-decoration: ${p => (p.done ? 'line-through' : 'none')};
-  opacity: ${p => (p.done ? 0.6 : 1)};
+  text-decoration: ${p => (p.maxed ? 'line-through' : 'none')};
+`;
+
+const StepCounter = styled.span<{ maxed: boolean }>`
+  font-size: 11px;
+  font-weight: 700;
+  color: ${p => (p.maxed ? p.theme.colors.warning : p.theme.colors.textSecondary)};
+  font-variant-numeric: tabular-nums;
 `;
 
 const StepDesc = styled.div`
   font-size: 11px;
   color: ${p => p.theme.colors.textSecondary};
   line-height: 1.3;
-  margin-top: 1px;
 `;
 
-const CompletedMsg = styled.p`
-  font-size: 12px;
-  color: ${p => p.theme.colors.success};
-  text-align: center;
-  font-weight: 600;
-  padding: 8px;
-  background: ${p => p.theme.colors.success}18;
-  border-radius: 6px;
+const StepBar = styled.div`
+  width: 100%;
+  height: 3px;
+  background: ${p => p.theme.colors.border};
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+`;
+
+const StepFill = styled.div<{ percentage: number; maxed: boolean }>`
+  height: 100%;
+  width: ${p => p.percentage}%;
+  background: ${p => (p.maxed ? p.theme.colors.warning : p.theme.colors.primary)};
+  border-radius: 999px;
+  transition: width 0.4s ease;
+`;
+
+const StepLevel = styled.div`
+  font-size: 10px;
+  color: ${p => p.theme.colors.textSecondary};
+  font-style: italic;
+  margin-top: 2px;
 `;
 
 const MissionsLink = styled.button`

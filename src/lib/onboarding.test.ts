@@ -23,91 +23,134 @@ const mkTask = (over: Partial<Task> = {}): Task => ({
   ...over,
 });
 
-describe('computeOnboarding', () => {
-  it('retorna 5 passos sempre', () => {
+describe('computeOnboarding (cadeias progressivas)', () => {
+  it('retorna 5 slots sempre', () => {
     expect(computeOnboarding(null, [])).toHaveLength(5);
   });
 
-  it('com usuário totalmente novo, nada está concluído', () => {
+  it('com usuário novo, todas as missões estão no nível 1 e nada maxado', () => {
     const steps = computeOnboarding(null, []);
-    expect(steps.every(s => !s.done)).toBe(true);
+    expect(steps.every(s => s.level === 1 && !s.isMaxed)).toBe(true);
   });
 
-  it('marca "Criar primeira tarefa" quando há ao menos 1 tarefa', () => {
-    const steps = computeOnboarding(mkProgress({ total_tasks_created: 1 }), []);
-    expect(steps.find(s => s.id === 'first-task')?.done).toBe(true);
+  it('promove o slot "create" do nível 1 para 2 ao criar 1 tarefa', () => {
+    const s1 = computeOnboarding(mkProgress({ total_tasks_created: 0 }), []);
+    const s2 = computeOnboarding(mkProgress({ total_tasks_created: 1 }), []);
+
+    const create1 = s1.find(s => s.slotId === 'create')!;
+    const create2 = s2.find(s => s.slotId === 'create')!;
+
+    expect(create1.id).toBe('create-1');
+    expect(create1.level).toBe(1);
+    expect(create1.target).toBe(1);
+
+    // Ao atingir target=1, próxima missão já entra no lugar
+    expect(create2.id).toBe('create-5');
+    expect(create2.level).toBe(2);
+    expect(create2.target).toBe(5);
+    expect(create2.current).toBe(1);
   });
 
-  it('marca "Concluir tarefa" quando total_tasks_completed >= 1', () => {
-    const steps = computeOnboarding(mkProgress({ total_tasks_completed: 1 }), []);
-    expect(steps.find(s => s.id === 'complete-task')?.done).toBe(true);
+  it('vai direto pro último nível quando o usuário pula etapas', () => {
+    const steps = computeOnboarding(mkProgress({ total_tasks_created: 60 }), []);
+    const create = steps.find(s => s.slotId === 'create')!;
+    expect(create.id).toBe('create-100');
+    expect(create.level).toBe(4);
+    expect(create.target).toBe(100);
+    expect(create.isMaxed).toBe(false);
   });
 
-  it('marca "Sequência de 3 dias" considerando best_streak (não só current)', () => {
+  it('marca isMaxed quando a cadeia inteira é vencida', () => {
+    const steps = computeOnboarding(mkProgress({ total_tasks_created: 999 }), []);
+    const create = steps.find(s => s.slotId === 'create')!;
+    expect(create.isMaxed).toBe(true);
+    expect(create.id).toBe('create-100'); // última da cadeia
+    expect(create.level).toBe(4);
+    expect(create.total).toBe(4);
+  });
+
+  it('"complete" sobe os níveis conforme tarefas concluídas crescem', () => {
+    const steps = computeOnboarding(mkProgress({ total_tasks_completed: 15 }), []);
+    const c = steps.find(s => s.slotId === 'complete')!;
+    expect(c.id).toBe('complete-50'); // 15 já passou de 1 e 10, próxima é 50
+    expect(c.level).toBe(3);
+  });
+
+  it('"streak" usa best_streak (não só current)', () => {
     const steps = computeOnboarding(
-      mkProgress({ current_streak: 0, best_streak: 3 }),
+      mkProgress({ current_streak: 0, best_streak: 5 }),
       []
     );
-    expect(steps.find(s => s.id === 'streak-3')?.done).toBe(true);
+    const s = steps.find(s => s.slotId === 'streak')!;
+    expect(s.current).toBe(5);
+    expect(s.id).toBe('streak-7'); // 5 já passou de 3, próxima é 7
   });
 
-  it('marca "100 XP" quando experience_points >= 100', () => {
-    const steps = computeOnboarding(mkProgress({ experience_points: 100 }), []);
-    expect(steps.find(s => s.id === 'xp-100')?.done).toBe(true);
+  it('"xp" sobe os patamares 100 → 500 → 2000 → 10000', () => {
+    const steps = computeOnboarding(mkProgress({ experience_points: 600 }), []);
+    const xp = steps.find(s => s.slotId === 'xp')!;
+    expect(xp.id).toBe('xp-2000');
+    expect(xp.current).toBe(600);
+    expect(xp.target).toBe(2000);
   });
 
-  it('NÃO marca "100 XP" com 99 XP', () => {
-    const steps = computeOnboarding(mkProgress({ experience_points: 99 }), []);
-    expect(steps.find(s => s.id === 'xp-100')?.done).toBe(false);
-  });
-
-  it('marca "Compartilhar" quando alguma tarefa tem shared_with não vazio', () => {
-    const tasks = [mkTask({ shared_with: ['some-user-id'] })];
+  it('"share" conta tarefas com shared_with não vazio', () => {
+    const tasks = [
+      mkTask({ shared_with: ['u1'] }),
+      mkTask({ shared_with: ['u2', 'u3'] }),
+      mkTask({ shared_with: [] }),
+    ];
     const steps = computeOnboarding(null, tasks);
-    expect(steps.find(s => s.id === 'share-task')?.done).toBe(true);
+    const share = steps.find(s => s.slotId === 'share')!;
+    expect(share.current).toBe(2);
+    expect(share.id).toBe('share-3');
   });
 
-  it('NÃO marca "Compartilhar" se nenhuma tarefa tem shared_with', () => {
-    const tasks = [mkTask({ shared_with: [] }), mkTask({ shared_with: [] })];
-    const steps = computeOnboarding(null, tasks);
-    expect(steps.find(s => s.id === 'share-task')?.done).toBe(false);
+  it('o slot "create" considera tasks.length quando progress está atrás', () => {
+    // progress diz 0 mas o array tem 2 tarefas → assume 2 (defesa contra inconsistência)
+    const steps = computeOnboarding(
+      mkProgress({ total_tasks_created: 0 }),
+      [mkTask({ id: 'a' }), mkTask({ id: 'b' })]
+    );
+    const create = steps.find(s => s.slotId === 'create')!;
+    expect(create.current).toBe(2);
   });
 });
 
-describe('onboardingCompletion', () => {
-  it('retorna 0/5 quando nada está concluído', () => {
-    const steps = computeOnboarding(null, []);
-    const c = onboardingCompletion(steps);
-    expect(c.done).toBe(0);
+describe('onboardingCompletion (slots maxados)', () => {
+  it('retorna 0/5 com usuário novo', () => {
+    const c = onboardingCompletion(computeOnboarding(null, []));
+    expect(c.maxed).toBe(0);
     expect(c.total).toBe(5);
     expect(c.percentage).toBe(0);
   });
 
-  it('retorna percentage proporcional aos passos concluídos', () => {
-    const steps = computeOnboarding(
-      mkProgress({ total_tasks_completed: 1, experience_points: 100 }),
-      []
-    );
-    const c = onboardingCompletion(steps);
-    // Os dois (complete-task e xp-100) estão done. Como total_tasks_created
-    // continua 0, o passo first-task NÃO está done.
-    expect(c.done).toBe(2);
-    expect(c.percentage).toBeCloseTo(40, 5);
+  it('conta apenas slots completamente vencidos', () => {
+    // 60 criadas (passou da última de complete=200? não, só da última de create=100? sim)
+    // create: 60 < 100, não maxed
+    // complete: 0, not maxed
+    const c = onboardingCompletion(computeOnboarding(
+      mkProgress({ total_tasks_created: 60 }),
+      [],
+    ));
+    expect(c.maxed).toBe(0);
   });
 
-  it('retorna 5/5 com tudo completo', () => {
-    const tasks = [mkTask({ shared_with: ['x'] })];
+  it('marca todos os 5 slots como maxados', () => {
+    const tasks = Array.from({ length: 10 }, (_, i) =>
+      mkTask({ id: `${i}`, shared_with: ['u'] })
+    );
     const steps = computeOnboarding(
       mkProgress({
-        total_tasks_created: 1,
-        total_tasks_completed: 1,
-        best_streak: 5,
-        experience_points: 200,
+        total_tasks_created: 200,
+        total_tasks_completed: 300,
+        best_streak: 150,
+        experience_points: 15000,
       }),
       tasks
     );
     const c = onboardingCompletion(steps);
-    expect(c.done).toBe(5);
+    expect(c.maxed).toBe(5);
     expect(c.percentage).toBe(100);
   });
 });
