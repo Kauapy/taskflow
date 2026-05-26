@@ -172,7 +172,7 @@ const Dashboard = () => {
             )}
 
             {view === 'missions' && (
-              <Missions progress={progress} loading={progressLoading} />
+              <Missions progress={progress} tasks={tasks} loading={progressLoading} />
             )}
 
             {view === 'shared' && <SharedTasks />}

@@ -1,243 +1,152 @@
 import styled from 'styled-components';
-import { UserProgress } from '../lib/supabase';
-import { TrendingUp, MapPin, Flame, Award, Zap, CheckCircle } from 'lucide-react';
+import {
+  Award, Zap, Flame, CheckCircle, ListPlus, Share2, MapPin, Star, ChevronRight,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Task, UserProgress } from '../lib/supabase';
+import { computeOnboarding, OnboardingSlotId, OnboardingStep } from '../lib/onboarding';
 
 interface MissionsProps {
   progress: UserProgress | null;
+  tasks: Task[];
   loading: boolean;
 }
 
-const Missions = ({ progress, loading }: MissionsProps) => {
-  if (loading || !progress) {
+interface SlotMeta {
+  Icon: LucideIcon;
+  /** Cor do destaque do card. */
+  accent: string;
+}
+
+const SLOT_META: Record<OnboardingSlotId, SlotMeta> = {
+  create:    { Icon: ListPlus,     accent: '#FF6B35' },
+  complete:  { Icon: CheckCircle,  accent: '#28A745' },
+  streak:    { Icon: Flame,        accent: '#FF4500' },
+  xp:        { Icon: Zap,          accent: '#FFC107' },
+  share:     { Icon: Share2,       accent: '#17A2B8' },
+  locations: { Icon: MapPin,       accent: '#8A2BE2' },
+};
+
+const Missions = ({ progress, tasks, loading }: MissionsProps) => {
+  if (loading) {
     return <LoadingText>Carregando missões...</LoadingText>;
   }
 
-  const missions = [
-    {
-      id: 1,
-      title: 'Completar 5 tarefas',
-      description: 'Complete 5 tarefas para ganhar +100 XP',
-      icon: <CheckCircle size={24} />,
-      current: progress.total_tasks_completed,
-      target: 5,
-      color: '#FF6B35',
-      reward: 100,
-    },
-    {
-      id: 2,
-      title: 'Completar 25 tarefas',
-      description: 'Complete 25 tarefas para ganhar +500 XP',
-      icon: <CheckCircle size={24} />,
-      current: progress.total_tasks_completed,
-      target: 25,
-      color: '#FFA07A',
-      reward: 500,
-    },
-    {
-      id: 5,
-      title: 'Completar 100 tarefas',
-      description: 'Uma marca histórica! Complete 100 tarefas.',
-      icon: <Award size={24} />,
-      current: progress.total_tasks_completed,
-      target: 100,
-      color: '#E0115F',
-      reward: 2500,
-    },
-    {
-      id: 6,
-      title: 'Mestre das Tarefas',
-      description: 'Complete 500 tarefas para obter um bônus especial.',
-      icon: <Award size={24} />,
-      current: progress.total_tasks_completed,
-      target: 500,
-      color: '#8A2BE2',
-      reward: 10000,
-    },
-    {
-      id: 3,
-      title: 'Adicionar 3 locais',
-      description: 'Use 3 localizações diferentes',
-      icon: <MapPin size={24} />,
-      current: progress.total_locations,
-      target: 3,
-      color: '#17A2B8',
-      reward: 150,
-    },
-    {
-      id: 7,
-      title: 'Explorador',
-      description: 'Use 10 localizações diferentes',
-      icon: <MapPin size={24} />,
-      current: progress.total_locations,
-      target: 10,
-      color: '#007BFF',
-      reward: 600,
-    },
-    {
-      id: 8,
-      title: 'Viajante',
-      description: 'Use 25 localizações diferentes',
-      icon: <MapPin size={24} />,
-      current: progress.total_locations,
-      target: 25,
-      color: '#0000CD',
-      reward: 2000,
-    },
-    {
-      id: 4,
-      title: 'Criar 10 tarefas',
-      description: 'Crie 10 tarefas no total',
-      icon: <Zap size={24} />,
-      current: progress.total_tasks_created,
-      target: 10,
-      color: '#FFC107',
-      reward: 200,
-    },
-    {
-      id: 9,
-      title: 'Criar 50 tarefas',
-      description: 'Adicione 50 tarefas ao seu fluxo',
-      icon: <Zap size={24} />,
-      current: progress.total_tasks_created,
-      target: 50,
-      color: '#FF9800',
-      reward: 800,
-    },
-    {
-      id: 10,
-      title: 'Organizador Nato',
-      description: 'Crie 200 tarefas no total',
-      icon: <TrendingUp size={24} />,
-      current: progress.total_tasks_created,
-      target: 200,
-      color: '#FF5722',
-      reward: 3000,
-    },
-    {
-      id: 11,
-      title: 'Aquecimento',
-      description: 'Mantenha uma sequência de 3 dias seguidos',
-      icon: <Flame size={24} />,
-      current: progress.current_streak,
-      target: 3,
-      color: '#FF4500',
-      reward: 300,
-    },
-    {
-      id: 12,
-      title: 'Pegando Fogo',
-      description: 'Mantenha uma sequência de 7 dias seguidos',
-      icon: <Flame size={24} />,
-      current: progress.current_streak,
-      target: 7,
-      color: '#E25822',
-      reward: 1000,
-    },
-    {
-      id: 13,
-      title: 'Hábito Formado',
-      description: 'Alcance 30 dias seguidos completando tarefas',
-      icon: <Flame size={24} />,
-      current: progress.current_streak,
-      target: 30,
-      color: '#DC143C',
-      reward: 5000,
-    },
-    {
-      id: 14,
-      title: 'Implacável',
-      description: 'Atingir uma sequência de 100 dias!',
-      icon: <Flame size={24} />,
-      current: progress.current_streak,
-      target: 100,
-      color: '#8B0000',
-      reward: 20000,
-    }
-  ];
+  const steps = computeOnboarding(progress, tasks);
+  const maxedCount = steps.filter(s => s.isMaxed).length;
 
-  const getProgressPercentage = (current: number, target: number) => {
-    return Math.min((current / target) * 100, 100);
-  };
+  const level = progress?.level ?? 1;
+  const xp = progress?.experience_points ?? 0;
+  const completed = progress?.total_tasks_completed ?? 0;
+  const streak = progress?.current_streak ?? 0;
 
   return (
     <Container>
       <StatsGrid>
         <StatCard>
-          <StatIcon color="#FF6B35">
-            <Award size={28} />
-          </StatIcon>
+          <StatIcon color="#FF6B35"><Award size={28} aria-hidden="true" /></StatIcon>
           <StatInfo>
-            <StatValue>Nível {progress.level}</StatValue>
-            <StatLabel>Seu Nível</StatLabel>
+            <StatValue>Nível {level}</StatValue>
+            <StatLabel>Seu nível</StatLabel>
           </StatInfo>
         </StatCard>
-
         <StatCard>
-          <StatIcon color="#FFA07A">
-            <Zap size={28} />
-          </StatIcon>
+          <StatIcon color="#FFA07A"><Zap size={28} aria-hidden="true" /></StatIcon>
           <StatInfo>
-            <StatValue>{progress.experience_points} XP</StatValue>
+            <StatValue>{xp} XP</StatValue>
             <StatLabel>Experiência</StatLabel>
           </StatInfo>
         </StatCard>
-
         <StatCard>
-          <StatIcon color="#28A745">
-            <CheckCircle size={28} />
-          </StatIcon>
+          <StatIcon color="#28A745"><CheckCircle size={28} aria-hidden="true" /></StatIcon>
           <StatInfo>
-            <StatValue>{progress.total_tasks_completed}</StatValue>
-            <StatLabel>Tarefas Concluídas</StatLabel>
+            <StatValue>{completed}</StatValue>
+            <StatLabel>Tarefas concluídas</StatLabel>
           </StatInfo>
         </StatCard>
-
         <StatCard>
-          <StatIcon color="#17A2B8">
-            <Flame size={28} />
-          </StatIcon>
+          <StatIcon color="#17A2B8"><Flame size={28} aria-hidden="true" /></StatIcon>
           <StatInfo>
-            <StatValue>{progress.current_streak} dias</StatValue>
-            <StatLabel>Sequência</StatLabel>
+            <StatValue>{streak} dias</StatValue>
+            <StatLabel>Sequência atual</StatLabel>
           </StatInfo>
         </StatCard>
       </StatsGrid>
 
+      <SectionHeader>
+        <h2>Missões em progresso</h2>
+        <SectionSubtitle>
+          <span>Ao bater o objetivo, a próxima missão da cadeia entra automaticamente.</span>
+          {maxedCount > 0 && (
+            <MaxedSummary>
+              <Star size={12} aria-hidden="true" />
+              {maxedCount} {maxedCount === 1 ? 'cadeia completa' : 'cadeias completas'}
+            </MaxedSummary>
+          )}
+        </SectionSubtitle>
+      </SectionHeader>
+
       <MissionsGrid>
-        {missions.map((mission) => {
-          const percentage = getProgressPercentage(mission.current, mission.target);
-          const isCompleted = percentage >= 100;
-
-          return (
-            <MissionCard key={mission.id} completed={isCompleted}>
-              <MissionHeader>
-                <MissionIcon color={mission.color} completed={isCompleted}>
-                  {mission.icon}
-                </MissionIcon>
-                <MissionInfo>
-                  <MissionTitle completed={isCompleted}>{mission.title}</MissionTitle>
-                  <MissionDescription>{mission.description}</MissionDescription>
-                </MissionInfo>
-                {isCompleted && <CompletedBadge>✓</CompletedBadge>}
-              </MissionHeader>
-
-              <ProgressBar>
-                <ProgressFill percentage={percentage} color={mission.color} />
-              </ProgressBar>
-
-              <MissionFooter>
-                <ProgressText>
-                  {mission.current} / {mission.target}
-                </ProgressText>
-                <RewardText>+{mission.reward} XP</RewardText>
-              </MissionFooter>
-            </MissionCard>
-          );
-        })}
+        {steps.map(step => (
+          <MissionCard key={step.slotId} step={step} />
+        ))}
       </MissionsGrid>
     </Container>
   );
 };
+
+const MissionCard = ({ step }: { step: OnboardingStep }) => {
+  const meta = SLOT_META[step.slotId];
+  const pct = step.target === 0 ? 100 : Math.min(100, (step.current / step.target) * 100);
+  const Icon = meta.Icon;
+
+  return (
+    <Card maxed={step.isMaxed} accent={meta.accent}>
+      <CardHeader>
+        <CardIcon color={meta.accent} maxed={step.isMaxed}>
+          <Icon size={22} aria-hidden="true" />
+        </CardIcon>
+        <CardHead>
+          <CardTitle maxed={step.isMaxed}>{step.title}</CardTitle>
+          <CardDesc>{step.description}</CardDesc>
+        </CardHead>
+        {step.isMaxed && (
+          <MaxedBadge title="Cadeia completa">
+            <Star size={14} aria-hidden="true" />
+          </MaxedBadge>
+        )}
+      </CardHeader>
+
+      <ProgressArea>
+        <ProgressBar>
+          <ProgressFill percentage={pct} color={meta.accent} maxed={step.isMaxed} />
+        </ProgressBar>
+        <ProgressInfo>
+          <Counter maxed={step.isMaxed}>
+            {step.isMaxed
+              ? '✓ Cadeia completa'
+              : `${formatNum(step.current)} / ${formatNum(step.target)}`}
+          </Counter>
+          <LevelText>
+            Nível {step.level} de {step.total}
+          </LevelText>
+        </ProgressInfo>
+      </ProgressArea>
+
+      {!step.isMaxed && step.level < step.total && (
+        <NextHint>
+          <ChevronRight size={12} aria-hidden="true" />
+          Próximo desafio: nível {step.level + 1} de {step.total}
+        </NextHint>
+      )}
+    </Card>
+  );
+};
+
+const formatNum = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(1)}k`.replace('.0', '') : `${n}`;
+
+// ──────────────────────────────────────────────────────── styled
 
 const Container = styled.div`
   display: flex;
@@ -252,50 +161,85 @@ const StatsGrid = styled.div`
 `;
 
 const StatCard = styled.div`
-  background: ${props => props.theme.colors.background};
-  border: 2px solid ${props => props.theme.colors.border};
+  background: ${p => p.theme.colors.surface};
+  border: 1px solid ${p => p.theme.colors.border};
   border-radius: 12px;
   padding: 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: ${props => props.theme.colors.primary};
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px ${props => props.theme.colors.shadow};
+    border-color: ${p => p.theme.colors.primary};
+    transform: translateY(-1px);
   }
 `;
 
 const StatIcon = styled.div<{ color: string }>`
-  background: ${props => props.color}22;
-  color: ${props => props.color};
-  width: 56px;
-  height: 56px;
+  background: ${p => p.color}22;
+  color: ${p => p.color};
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid ${props => props.color};
+  border: 1px solid ${p => p.color}55;
+  flex-shrink: 0;
 `;
 
 const StatInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 `;
 
 const StatValue = styled.div`
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
-  color: ${props => props.theme.colors.text};
+  color: ${p => p.theme.colors.text};
 `;
 
 const StatLabel = styled.div`
-  font-size: 13px;
-  color: ${props => props.theme.colors.textSecondary};
+  font-size: 12px;
+  color: ${p => p.theme.colors.textSecondary};
   font-weight: 500;
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: ${p => p.theme.colors.text};
+  }
+`;
+
+const SectionSubtitle = styled.div`
+  font-size: 13px;
+  color: ${p => p.theme.colors.textSecondary};
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const MaxedSummary = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: ${p => p.theme.colors.warning}22;
+  color: ${p => p.theme.colors.warning};
+  border: 1px solid ${p => p.theme.colors.warning}55;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
 `;
 
 const MissionsGrid = styled.div`
@@ -304,117 +248,131 @@ const MissionsGrid = styled.div`
   gap: 16px;
 `;
 
-const MissionCard = styled.div<{ completed: boolean }>`
-  background: ${props => props.theme.colors.background};
-  border: 2px solid ${props => props.completed
-    ? props.theme.colors.success
-    : props.theme.colors.border};
+const Card = styled.div<{ maxed: boolean; accent: string }>`
+  background: ${p => p.theme.colors.surface};
+  border: 1px solid ${p =>
+    p.maxed ? p.theme.colors.warning + '88' : p.theme.colors.border};
+  border-left: 3px solid ${p => (p.maxed ? p.theme.colors.warning : p.accent)};
   border-radius: 12px;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: ${p => (p.maxed ? 0.85 : 1)};
   transition: all 0.2s ease;
-  opacity: ${props => props.completed ? 0.8 : 1};
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px ${props => props.theme.colors.shadow};
+    box-shadow: 0 4px 12px ${p => p.theme.colors.shadow};
   }
 `;
 
-const MissionHeader = styled.div`
+const CardHeader = styled.div`
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  margin-bottom: 12px;
-  position: relative;
 `;
 
-const MissionIcon = styled.div<{ color: string; completed: boolean }>`
-  background: ${props => props.completed
-    ? props.theme.colors.success + '22'
-    : props.color + '22'};
-  color: ${props => props.completed
-    ? props.theme.colors.success
-    : props.color};
-  width: 48px;
-  height: 48px;
+const CardIcon = styled.div<{ color: string; maxed: boolean }>`
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: ${p => (p.maxed ? p.theme.colors.warning : p.color)}22;
+  color: ${p => (p.maxed ? p.theme.colors.warning : p.color)};
+  border: 1px solid ${p => (p.maxed ? p.theme.colors.warning : p.color)}55;
   flex-shrink: 0;
-  border: 2px solid ${props => props.completed
-    ? props.theme.colors.success
-    : props.color};
 `;
 
-const MissionInfo = styled.div`
+const CardHead = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const MissionTitle = styled.h4<{ completed: boolean }>`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: 4px;
-  text-decoration: ${props => props.completed ? 'line-through' : 'none'};
+const CardTitle = styled.h3<{ maxed: boolean }>`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${p => p.theme.colors.text};
+  text-decoration: ${p => (p.maxed ? 'line-through' : 'none')};
+  line-height: 1.3;
+  margin-bottom: 2px;
 `;
 
-const MissionDescription = styled.p`
-  font-size: 13px;
-  color: ${props => props.theme.colors.textSecondary};
+const CardDesc = styled.p`
+  font-size: 12px;
+  color: ${p => p.theme.colors.textSecondary};
   line-height: 1.4;
 `;
 
-const CompletedBadge = styled.div`
-  background: ${props => props.theme.colors.success};
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+const MaxedBadge = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: ${p => p.theme.colors.warning};
+  color: white;
+  flex-shrink: 0;
+`;
+
+const ProgressArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 `;
 
 const ProgressBar = styled.div`
-  height: 8px;
-  background: ${props => props.theme.colors.border};
-  border-radius: 4px;
+  width: 100%;
+  height: 6px;
+  background: ${p => p.theme.colors.border};
+  border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 8px;
 `;
 
-const ProgressFill = styled.div<{ percentage: number; color: string }>`
+const ProgressFill = styled.div<{ percentage: number; color: string; maxed: boolean }>`
   height: 100%;
-  width: ${props => props.percentage}%;
-  background: ${props => props.color};
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  width: ${p => p.percentage}%;
+  background: ${p => (p.maxed ? p.theme.colors.warning : p.color)};
+  border-radius: 999px;
+  transition: width 0.4s ease;
 `;
 
-const MissionFooter = styled.div`
+const ProgressInfo = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 `;
 
-const ProgressText = styled.span`
-  font-size: 13px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-`;
-
-const RewardText = styled.span`
+const Counter = styled.span<{ maxed: boolean }>`
   font-size: 13px;
   font-weight: 700;
-  color: ${props => props.theme.colors.primary};
+  color: ${p => (p.maxed ? p.theme.colors.warning : p.theme.colors.text)};
+  font-variant-numeric: tabular-nums;
+`;
+
+const LevelText = styled.span`
+  font-size: 11px;
+  color: ${p => p.theme.colors.textSecondary};
+  font-style: italic;
+`;
+
+const NextHint = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: ${p => p.theme.colors.textSecondary};
+  font-style: italic;
+  margin-top: -4px;
 `;
 
 const LoadingText = styled.p`
   text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
+  color: ${p => p.theme.colors.textSecondary};
   padding: 32px;
   font-size: 15px;
 `;

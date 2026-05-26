@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import {
   Award, Zap, Flame, ChevronRight, Target, ListPlus, CheckCircle2,
-  Share2, Star,
+  Share2, Star, MapPin,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Task, UserProgress } from '../lib/supabase';
@@ -22,6 +22,7 @@ const SLOT_ICON: Record<OnboardingSlotId, LucideIcon> = {
   streak: Flame,
   xp: Zap,
   share: Share2,
+  locations: MapPin,
 };
 
 const OnboardingPanel = ({ progress, tasks, onNavigate }: OnboardingPanelProps) => {

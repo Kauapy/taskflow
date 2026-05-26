@@ -1,6 +1,12 @@
 import { Task, UserProgress } from './supabase';
 
-export type OnboardingSlotId = 'create' | 'complete' | 'streak' | 'xp' | 'share';
+export type OnboardingSlotId =
+  | 'create'
+  | 'complete'
+  | 'streak'
+  | 'xp'
+  | 'share'
+  | 'locations';
 export type OnboardingCta = 'tasks' | 'shared' | 'analytics';
 
 interface SlotMission {
@@ -72,6 +78,16 @@ const SLOTS: SlotDefinition[] = [
       { id: 'share-1', title: 'Compartilhe uma tarefa', description: 'Por e-mail ou link',  target: 1 },
       { id: 'share-3', title: 'Compartilhe 3 tarefas',  description: 'Colabore com o time', target: 3 },
       { id: 'share-10', title: 'Compartilhe 10 tarefas', description: 'Trabalho em equipe', target: 10 },
+    ],
+  },
+  {
+    id: 'locations',
+    cta: 'tasks',
+    getCurrent: (p) => p?.total_locations ?? 0,
+    chain: [
+      { id: 'locations-3',  title: 'Use 3 locais diferentes',  description: 'Varie seus contextos',    target: 3 },
+      { id: 'locations-10', title: 'Use 10 locais diferentes', description: 'Explorador',               target: 10 },
+      { id: 'locations-25', title: 'Use 25 locais diferentes', description: 'Viajante incansável',      target: 25 },
     ],
   },
 ];

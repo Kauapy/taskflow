@@ -24,8 +24,8 @@ const mkTask = (over: Partial<Task> = {}): Task => ({
 });
 
 describe('computeOnboarding (cadeias progressivas)', () => {
-  it('retorna 5 slots sempre', () => {
-    expect(computeOnboarding(null, [])).toHaveLength(5);
+  it('retorna 6 slots sempre', () => {
+    expect(computeOnboarding(null, [])).toHaveLength(6);
   });
 
   it('com usuário novo, todas as missões estão no nível 1 e nada maxado', () => {
@@ -118,10 +118,10 @@ describe('computeOnboarding (cadeias progressivas)', () => {
 });
 
 describe('onboardingCompletion (slots maxados)', () => {
-  it('retorna 0/5 com usuário novo', () => {
+  it('retorna 0/6 com usuário novo', () => {
     const c = onboardingCompletion(computeOnboarding(null, []));
     expect(c.maxed).toBe(0);
-    expect(c.total).toBe(5);
+    expect(c.total).toBe(6);
     expect(c.percentage).toBe(0);
   });
 
@@ -146,11 +146,27 @@ describe('onboardingCompletion (slots maxados)', () => {
         total_tasks_completed: 300,
         best_streak: 150,
         experience_points: 15000,
+        total_locations: 30,
       }),
       tasks
     );
     const c = onboardingCompletion(steps);
-    expect(c.maxed).toBe(5);
+    expect(c.maxed).toBe(6);
     expect(c.percentage).toBe(100);
+  });
+
+  it('locations: nível 1 quando user tem menos de 3 locais', () => {
+    const steps = computeOnboarding(mkProgress({ total_locations: 2 }), []);
+    const loc = steps.find(s => s.slotId === 'locations')!;
+    expect(loc.id).toBe('locations-3');
+    expect(loc.level).toBe(1);
+    expect(loc.current).toBe(2);
+  });
+
+  it('locations: promove para 10 após atingir 3', () => {
+    const steps = computeOnboarding(mkProgress({ total_locations: 3 }), []);
+    const loc = steps.find(s => s.slotId === 'locations')!;
+    expect(loc.id).toBe('locations-10');
+    expect(loc.level).toBe(2);
   });
 });
