@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // O backend (server/) tem ESLint/tsconfig próprios e convenções de Node
+  // (console, params _next do Express). db/ só tem SQL. dist/ é build.
+  { ignores: ['dist', 'server', 'db'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
