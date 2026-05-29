@@ -1,0 +1,2 @@
+# Migrations SQL ficarão aqui (Fase H da migração Supabase → backend próprio).
+# Estrutura: NNNN_descricao.sql, aplicadas em ordem alfabética pelo runner em server/src/migrate.ts.
