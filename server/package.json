@@ -11,6 +11,7 @@
     "migrate": "tsx src/migrate.ts",
     "smoke": "tsx src/smoke-auth.ts",
     "smoke:tasks": "tsx src/smoke-tasks.ts",
+    "smoke:shares": "tsx src/smoke-shares.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
