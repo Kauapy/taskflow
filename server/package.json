@@ -12,9 +12,11 @@
     "smoke": "tsx src/smoke-auth.ts",
     "smoke:tasks": "tsx src/smoke-tasks.ts",
     "smoke:shares": "tsx src/smoke-shares.ts",
+    "smoke:uploads": "tsx src/smoke-uploads.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1057.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

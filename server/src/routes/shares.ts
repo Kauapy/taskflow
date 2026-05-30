@@ -19,8 +19,10 @@ import { query, withTransaction } from '../db';
 import { requireAuth } from '../middleware/requireAuth';
 import { Errors } from '../middleware/error';
 
+// Montado em '/' no index.ts. requireAuth é aplicado em CADA rota (não via
+// router.use) para que caminhos não-casados caiam no 404 handler, em vez de
+// receberem 401 de um catch-all.
 export const sharesRouter = Router();
-sharesRouter.use(requireAuth);
 
 // ── Compartilhar por e-mail ──────────────────────────────────────────────────
 
@@ -29,7 +31,7 @@ const shareSchema = z.object({
   email: z.string().email('E-mail inválido.'),
 });
 
-sharesRouter.post('/shares', async (req, res, next) => {
+sharesRouter.post('/shares', requireAuth, async (req, res, next) => {
   try {
     const { taskId, email } = shareSchema.parse(req.body);
     const me = req.user!;
@@ -106,7 +108,7 @@ interface IncomingShareRow {
   created_at: string;
 }
 
-sharesRouter.get('/shares/incoming', async (req, res, next) => {
+sharesRouter.get('/shares/incoming', requireAuth, async (req, res, next) => {
   try {
     const result = await query<IncomingShareRow>(
       `SELECT ts.id, ts.task_id, ts.status, ts.shared_by,
@@ -130,7 +132,7 @@ sharesRouter.get('/shares/incoming', async (req, res, next) => {
   }
 });
 
-sharesRouter.post('/shares/:id/accept', async (req, res, next) => {
+sharesRouter.post('/shares/:id/accept', requireAuth, async (req, res, next) => {
   try {
     const result = await query(
       `UPDATE task_shares SET status = 'accepted'
@@ -146,7 +148,7 @@ sharesRouter.post('/shares/:id/accept', async (req, res, next) => {
   }
 });
 
-sharesRouter.delete('/shares/:id', async (req, res, next) => {
+sharesRouter.delete('/shares/:id', requireAuth, async (req, res, next) => {
   try {
     // Tanto quem enviou (revogar) quanto quem recebeu (recusar) podem apagar.
     const result = await query(
@@ -181,7 +183,7 @@ interface ShareLinkRow {
   view_count: number;
 }
 
-sharesRouter.post('/share-links', async (req, res, next) => {
+sharesRouter.post('/share-links', requireAuth, async (req, res, next) => {
   try {
     const { taskId, expiresInDays } = createLinkSchema.parse(req.body);
     const me = req.user!;
@@ -214,7 +216,7 @@ sharesRouter.post('/share-links', async (req, res, next) => {
   }
 });
 
-sharesRouter.get('/share-links', async (req, res, next) => {
+sharesRouter.get('/share-links', requireAuth, async (req, res, next) => {
   try {
     const taskId = z.string().uuid().parse(req.query.taskId);
     const result = await query<ShareLinkRow>(
@@ -229,7 +231,7 @@ sharesRouter.get('/share-links', async (req, res, next) => {
   }
 });
 
-sharesRouter.post('/share-links/:id/revoke', async (req, res, next) => {
+sharesRouter.post('/share-links/:id/revoke', requireAuth, async (req, res, next) => {
   try {
     const result = await query(
       `UPDATE task_share_links SET revoked = true

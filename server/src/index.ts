@@ -18,6 +18,7 @@ import { tasksRouter } from './routes/tasks';
 import { progressRouter } from './routes/progress';
 import { sharesRouter } from './routes/shares';
 import { publicRouter } from './routes/public';
+import { uploadsRouter } from './routes/uploads';
 import { errorHandler } from './middleware/error';
 
 const app = express();
@@ -44,9 +45,30 @@ app.use('/auth', authRouter);
 // case primeiro e responda sem auth.
 app.use('/public', publicRouter);
 
+// Arquivos enviados (driver=disk): servidos estaticamente, leitura pública
+// (alinhado ao modelo de compartilhamento por link). Em produção com
+// driver=s3, os arquivos são servidos pelo próprio bucket/CDN e esta linha
+// fica inócua (a pasta local não é usada).
+if (config.storage.driver === 'disk') {
+  app.use(
+    '/static/uploads',
+    express.static(config.storage.diskDir, {
+      // fallthrough:false → arquivo inexistente responde 404 aqui mesmo,
+      // sem cair nas rotas de API (que dariam 401 pelo catch-all).
+      fallthrough: false,
+      // Força download seguro: nada de execução inline de HTML/JS.
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Disposition', 'inline');
+      },
+    })
+  );
+}
+
 // Recursos principais (todos exigem auth — middleware no próprio router)
 app.use('/tasks', tasksRouter);
 app.use('/progress', progressRouter);
+app.use('/uploads', uploadsRouter);
 // sharesRouter define os prefixos /shares e /share-links internamente
 app.use('/', sharesRouter);
 

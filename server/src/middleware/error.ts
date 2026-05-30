@@ -62,6 +62,20 @@ export function errorHandler(
     return;
   }
 
+  // Erros que já carregam status HTTP (ex.: serve-static lança 404 para
+  // arquivo inexistente com fallthrough:false). Respeita o status.
+  const httpStatus = (err as { status?: number; statusCode?: number })?.status
+    ?? (err as { statusCode?: number })?.statusCode;
+  if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 600) {
+    res.status(httpStatus).json({
+      error: {
+        code: httpStatus === 404 ? 'not_found' : 'error',
+        message: httpStatus === 404 ? 'Recurso não encontrado.' : 'Erro na requisição.',
+      },
+    });
+    return;
+  }
+
   // Erro inesperado
   // eslint-disable-next-line no-console
   console.error('Unhandled error:', err);
