@@ -10,6 +10,8 @@
  *
  * Cria um usuário aleatório, faz login e chama /me. Sai com código !=0 se algo falhar.
  */
+export {}; // torna este arquivo um módulo (escopo isolado)
+
 const BASE = process.env.SMOKE_BASE_URL ?? 'http://localhost:4000';
 
 interface AuthResponse {

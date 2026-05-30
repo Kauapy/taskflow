@@ -14,6 +14,8 @@ import cors from 'cors';
 import { config } from './config';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
+import { tasksRouter } from './routes/tasks';
+import { progressRouter } from './routes/progress';
 import { errorHandler } from './middleware/error';
 
 const app = express();
@@ -32,6 +34,10 @@ app.use('/health', healthRouter);
 
 // Autenticação
 app.use('/auth', authRouter);
+
+// Recursos principais (todos exigem auth — middleware no próprio router)
+app.use('/tasks', tasksRouter);
+app.use('/progress', progressRouter);
 
 // 404 padrão (qualquer rota não matched)
 app.use((_req, res) => {

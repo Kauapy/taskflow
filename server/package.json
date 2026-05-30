@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "migrate": "tsx src/migrate.ts",
     "smoke": "tsx src/smoke-auth.ts",
+    "smoke:tasks": "tsx src/smoke-tasks.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
