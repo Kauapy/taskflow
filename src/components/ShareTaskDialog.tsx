@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import {
   X, Share2, Mail, Link2, AlertCircle, CheckCircle, Copy, Eye, Trash2, Plus
 } from 'lucide-react';
-import { Task, TaskShareLink } from '../lib/supabase';
+import { Task, TaskShareLink } from '../lib/types';
 
 type Tab = 'email' | 'link';
 

@@ -1,4 +1,4 @@
-import { Task, UserProgress } from './supabase';
+import { Task, UserProgress } from './types';
 
 export type OnboardingSlotId =
   | 'create'

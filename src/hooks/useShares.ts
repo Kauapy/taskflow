@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, IncomingShare } from '../lib/supabase';
+import { apiFetch, ApiError } from '../lib/api';
+import { IncomingShare } from '../lib/types';
 import { useAuth } from './useAuth';
 
 export const useShares = () => {
@@ -14,15 +15,14 @@ export const useShares = () => {
       return;
     }
     setLoading(true);
-
-    const { data, error } = await supabase.rpc('get_incoming_shares');
-
-    if (!error && data) {
-      setIncoming(data as IncomingShare[]);
-    } else if (error) {
-      console.error('Erro ao buscar compartilhamentos recebidos:', error);
+    try {
+      const { incoming } = await apiFetch<{ incoming: IncomingShare[] }>('GET', '/shares/incoming');
+      setIncoming(incoming);
+    } catch {
+      // transitório
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
@@ -30,29 +30,23 @@ export const useShares = () => {
   }, [fetchShares]);
 
   const acceptShare = async (shareId: string): Promise<{ success: boolean; errorMessage?: string }> => {
-    const { error } = await supabase
-      .from('task_shares')
-      .update({ status: 'accepted' })
-      .eq('id', shareId);
-
-    if (error) {
-      return { success: false, errorMessage: error.message };
+    try {
+      await apiFetch('POST', `/shares/${shareId}/accept`);
+      await fetchShares();
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao aceitar.' };
     }
-    await fetchShares();
-    return { success: true };
   };
 
   const declineShare = async (shareId: string): Promise<{ success: boolean; errorMessage?: string }> => {
-    const { error } = await supabase
-      .from('task_shares')
-      .delete()
-      .eq('id', shareId);
-
-    if (error) {
-      return { success: false, errorMessage: error.message };
+    try {
+      await apiFetch('DELETE', `/shares/${shareId}`);
+      await fetchShares();
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao recusar.' };
     }
-    await fetchShares();
-    return { success: true };
   };
 
   return {

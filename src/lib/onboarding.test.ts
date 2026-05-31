@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeOnboarding, onboardingCompletion } from './onboarding';
-import type { Task, UserProgress } from './supabase';
+import type { Task, UserProgress } from './types';
 
 const mkProgress = (over: Partial<UserProgress> = {}): UserProgress => ({
   id: 'p', user_id: 'u',

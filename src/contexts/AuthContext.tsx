@@ -1,97 +1,70 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
-import { User } from '@supabase/supabase-js';
+import { apiFetch, getToken, setToken, clearToken, ApiError } from '../lib/api';
+import { AuthUser } from '../lib/types';
 
 export interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
+interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Ao montar: se há token salvo, restaura a sessão via /auth/me.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    const token = getToken();
+    if (!token) {
       setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription?.unsubscribe();
+      return;
+    }
+    apiFetch<{ user: AuthUser }>('GET', '/auth/me')
+      .then(({ user }) => setUser(user))
+      .catch(() => {
+        // token inválido/expirado → limpa
+        clearToken();
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { error: error.message };
+    try {
+      const { token, user } = await apiFetch<AuthResponse>('POST', '/auth/login', { email, password });
+      setToken(token);
+      setUser(user);
+      return { error: null };
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Falha ao entrar. Tente novamente.';
+      return { error: message };
     }
-
-    return { error: null };
   };
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        return { error: error.message };
-      }
-
-      // Garantir que o registro de progresso foi criado
-      if (data.user) {
-        // Aguardar um pouco para garantir que o trigger foi executado
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Verificar se o registro já existe
-        const { data: existingProgress, error: fetchError } = await supabase
-          .from('user_progress')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Erro ao buscar progresso:', fetchError);
-          return { error: `Erro ao criar perfil de usuário: ${fetchError.message}` };
-        }
-
-        // Se não existe, criar manualmente
-        if (!existingProgress) {
-          const { error: progressError } = await supabase
-            .from('user_progress')
-            .insert([{ user_id: data.user.id }]);
-
-          if (progressError) {
-            console.error('Erro ao inserir progresso:', progressError);
-            return { error: `Erro ao criar perfil de usuário: ${progressError.message}` };
-          }
-        }
-      }
-
+      const { token, user } = await apiFetch<AuthResponse>('POST', '/auth/signup', { email, password });
+      setToken(token);
+      setUser(user);
       return { error: null };
     } catch (err) {
-      console.error('Erro no signup:', err);
-      return { error: 'Erro ao criar conta. Tente novamente.' };
+      const message = err instanceof ApiError ? err.message : 'Erro ao criar conta. Tente novamente.';
+      return { error: message };
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    clearToken();
+    setUser(null);
   };
 
   return (

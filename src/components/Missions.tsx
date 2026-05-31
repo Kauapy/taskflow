@@ -3,7 +3,7 @@ import {
   Award, Zap, Flame, CheckCircle, ListPlus, Share2, MapPin, Star, ChevronRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Task, UserProgress } from '../lib/supabase';
+import { Task, UserProgress } from '../lib/types';
 import { computeOnboarding, OnboardingSlotId, OnboardingStep } from '../lib/onboarding';
 
 interface MissionsProps {

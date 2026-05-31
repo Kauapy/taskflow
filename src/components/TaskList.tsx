@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { Task } from '../lib/supabase';
+import { Task } from '../lib/types';
 import {
   CheckCircle2, Circle, Trash2, MapPin, AlertCircle,
   Pencil, Check, X, Clock, ChevronDown, ChevronUp, Share2, Paperclip

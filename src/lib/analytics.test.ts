@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateAnalytics } from './analytics';
-import type { Task, UserProgress } from './supabase';
+import type { Task, UserProgress } from './types';
 
 const NOW = new Date('2026-05-09T12:00:00Z');
 

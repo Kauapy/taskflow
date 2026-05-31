@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, Task, TaskShareLink } from '../lib/supabase';
-import { applyStreakOnCompletion } from '../lib/streak';
+import { apiFetch, ApiError } from '../lib/api';
+import { Task, TaskShareLink } from '../lib/types';
 import { useAuth } from './useAuth';
 
+/**
+ * Hook de tarefas. Fala com o backend REST próprio (antes era Supabase).
+ * Toda a lógica de XP/streak/locais agora roda no servidor — aqui só
+ * disparamos as operações e atualizamos o estado local.
+ */
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -10,43 +15,20 @@ export const useTasks = () => {
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
-
     setLoading(true);
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setTasks(data);
+    try {
+      const { tasks } = await apiFetch<{ tasks: Task[] }>('GET', '/tasks');
+      setTasks(tasks);
+    } catch {
+      // silencioso — UI mostra lista vazia; erros de rede são transitórios
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
-
-  const recalcLocations = async () => {
-    if (!user) return;
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('location')
-      .eq('user_id', user.id);
-    if (tasks) {
-      const uniqueLocations = new Set(
-        tasks.map(t => t.location).filter((l): l is string => Boolean(l))
-      );
-      await supabase
-        .from('user_progress')
-        .update({
-          total_locations: uniqueLocations.size,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
-    }
-  };
 
   const addTask = async (
     title: string,
@@ -56,131 +38,37 @@ export const useTasks = () => {
     dueDate?: string,
     attachments: string[] = []
   ): Promise<{ success: boolean; errorMessage?: string }> => {
-    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
-
-    const insertPayload: Record<string, unknown> = {
-      user_id: user.id,
-      title,
-      urgency,
-      location,
-      category,
-      due_date: dueDate || null,
-      attachments,
-    };
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([insertPayload])
-      .select()
-      .single();
-
-    if (error) {
-      const msg = `[${error.code}] ${error.message} — ${error.details ?? ''}`;
-      console.error('ERRO AO CRIAR TAREFA:', msg);
-      return { success: false, errorMessage: msg };
+    try {
+      const { task } = await apiFetch<{ task: Task }>('POST', '/tasks', {
+        title,
+        urgency,
+        location,
+        category,
+        due_date: dueDate ?? null,
+        attachments,
+      });
+      setTasks(prev => [task, ...prev]);
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao criar tarefa.' };
     }
-
-    if (data) {
-      setTasks(prev => [data, ...prev]);
-      await updateProgress('task_created', location);
-    }
-
-    return { success: true };
   };
 
   const completeTask = async (taskId: string) => {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ completed: true, completed_at: new Date().toISOString() })
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (!error && data) {
-      setTasks(prev => prev.map(t => t.id === taskId ? data : t));
-      await updateProgress('task_completed');
+    try {
+      const { task } = await apiFetch<{ task: Task }>('POST', `/tasks/${taskId}/complete`);
+      setTasks(prev => prev.map(t => (t.id === taskId ? task : t)));
+    } catch {
+      // ignora; refetch externo pode reconciliar
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', taskId);
-
-    if (!error) {
+    try {
+      await apiFetch('DELETE', `/tasks/${taskId}`);
       setTasks(prev => prev.filter(t => t.id !== taskId));
-      await recalcLocations();
-    }
-  };
-
-  const updateProgress = async (action: 'task_created' | 'task_completed', location?: string) => {
-    if (!user || !user.id) return;
-
-    const { data: progress, error: fetchError } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (fetchError) {
-      console.error('Erro ao buscar progresso:', fetchError);
-      return;
-    }
-    if (!progress) return;
-
-    const nowIso = new Date().toISOString();
-    const updates: Record<string, number | string> = {
-      updated_at: nowIso,
-      last_activity: nowIso,
-    };
-
-    let newXp = progress.experience_points;
-    let newCurrentStreak = progress.current_streak;
-    let newBestStreak = progress.best_streak;
-
-    if (action === 'task_created') {
-      updates.total_tasks_created = progress.total_tasks_created + 1;
-      newXp += 10;
-
-      if (location) {
-        const { data: tasks } = await supabase
-          .from('tasks')
-          .select('location')
-          .eq('user_id', user.id);
-
-        if (tasks) {
-          const uniqueLocations = new Set(
-            tasks.map(t => t.location).filter((l): l is string => Boolean(l))
-          );
-          updates.total_locations = uniqueLocations.size;
-        }
-      }
-    } else if (action === 'task_completed') {
-      updates.total_tasks_completed = progress.total_tasks_completed + 1;
-      newXp += 50;
-
-      const streak = applyStreakOnCompletion({
-        currentStreak: newCurrentStreak,
-        bestStreak: newBestStreak,
-        lastActivity: progress.last_activity,
-      });
-      newCurrentStreak = streak.currentStreak;
-      newBestStreak = streak.bestStreak;
-      updates.current_streak = newCurrentStreak;
-      updates.best_streak = newBestStreak;
-    }
-
-    updates.experience_points = newXp;
-    updates.level = Math.floor(newXp / 500) + 1;
-
-    const { error: updateError } = await supabase
-      .from('user_progress')
-      .update(updates)
-      .eq('user_id', user.id);
-
-    if (updateError) {
-      console.error('Erro ao atualizar progresso:', updateError);
+    } catch {
+      // ignora
     }
   };
 
@@ -188,144 +76,67 @@ export const useTasks = () => {
     taskId: string,
     updates: Partial<Pick<Task, 'title' | 'urgency' | 'location' | 'category' | 'due_date' | 'attachments'>>
   ) => {
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId)
-      .select()
-      .single();
-
-    if (!error && data) {
-      setTasks(prev => prev.map(t => t.id === taskId ? data : t));
-      if ('location' in updates) {
-        await recalcLocations();
-      }
+    try {
+      const { task } = await apiFetch<{ task: Task }>('PATCH', `/tasks/${taskId}`, updates);
+      setTasks(prev => prev.map(t => (t.id === taskId ? task : t)));
+    } catch {
+      // ignora
     }
-  };
-
-  const findUserIdByEmail = async (email: string): Promise<string | null> => {
-    const { data, error } = await supabase.rpc('find_user_id_by_email', { p_email: email });
-    if (error) {
-      console.error('Erro no lookup de e-mail:', error);
-      return null;
-    }
-    return (data as string | null) ?? null;
   };
 
   const shareTask = async (
     taskId: string,
     email: string
   ): Promise<{ success: boolean; errorMessage?: string }> => {
-    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
-
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) {
-      return { success: false, errorMessage: 'Informe um e-mail.' };
-    }
-    if (trimmed === (user.email ?? '').toLowerCase()) {
-      return { success: false, errorMessage: 'Você não pode compartilhar com você mesmo.' };
-    }
-
-    const recipientId = await findUserIdByEmail(trimmed);
-    if (!recipientId) {
-      return { success: false, errorMessage: 'Nenhum usuário cadastrado com esse e-mail.' };
-    }
-
-    const task = tasks.find(t => t.id === taskId);
-    if (task && task.shared_with?.includes(recipientId)) {
-      return { success: false, errorMessage: 'Esta tarefa já foi compartilhada com esse usuário.' };
-    }
-
-    const { error } = await supabase
-      .from('task_shares')
-      .insert([{
-        task_id: taskId,
-        shared_by: user.id,
-        shared_with: recipientId,
-        status: 'pending',
-      }]);
-
-    if (error) {
-      // 23505 = unique violation: já existe um share para esse par (task_id, shared_with)
-      if (error.code === '23505') {
-        return { success: false, errorMessage: 'Esta tarefa já foi compartilhada com esse usuário.' };
-      }
-      return { success: false, errorMessage: error.message };
-    }
-
-    if (task) {
-      await supabase
-        .from('tasks')
-        .update({ shared_with: [...(task.shared_with ?? []), recipientId] })
-        .eq('id', taskId);
+    try {
+      await apiFetch('POST', '/shares', { taskId, email });
+      // Mantém o array local em dia (o backend já atualizou no banco).
       setTasks(prev => prev.map(t =>
-        t.id === taskId
-          ? { ...t, shared_with: [...(t.shared_with ?? []), recipientId] }
-          : t
+        t.id === taskId ? { ...t, shared_with: [...(t.shared_with ?? []), '__shared__'] } : t
       ));
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao compartilhar.' };
     }
-
-    return { success: true };
   };
 
-  /**
-   * Gera um link público para a tarefa. Retorna o token e a URL completa.
-   * `expiresInDays` opcional — se não passado, link não expira.
-   */
   const createShareLink = async (
     taskId: string,
     expiresInDays?: number
   ): Promise<{ success: boolean; link?: TaskShareLink; url?: string; errorMessage?: string }> => {
-    if (!user) return { success: false, errorMessage: 'Usuário não autenticado.' };
-
-    const payload: Record<string, unknown> = {
-      task_id: taskId,
-      created_by: user.id,
-    };
-    if (expiresInDays && expiresInDays > 0) {
-      const exp = new Date();
-      exp.setDate(exp.getDate() + expiresInDays);
-      payload.expires_at = exp.toISOString();
+    try {
+      const { link } = await apiFetch<{ link: TaskShareLink }>('POST', '/share-links', {
+        taskId,
+        ...(expiresInDays ? { expiresInDays } : {}),
+      });
+      const url = `${window.location.origin}/shared/${link.token}`;
+      return { success: true, link, url };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao gerar link.' };
     }
-
-    const { data, error } = await supabase
-      .from('task_share_links')
-      .insert([payload])
-      .select()
-      .single();
-
-    if (error) {
-      return { success: false, errorMessage: error.message };
-    }
-
-    const link = data as TaskShareLink;
-    const url = `${window.location.origin}/shared/${link.token}`;
-    return { success: true, link, url };
   };
 
   const listShareLinks = async (taskId: string): Promise<TaskShareLink[]> => {
-    if (!user) return [];
-    const { data, error } = await supabase
-      .from('task_share_links')
-      .select('*')
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.error('Erro ao listar share links:', error);
+    try {
+      const { links } = await apiFetch<{ links: TaskShareLink[] }>(
+        'GET',
+        `/share-links?taskId=${encodeURIComponent(taskId)}`
+      );
+      return links;
+    } catch {
       return [];
     }
-    return (data as TaskShareLink[]) ?? [];
   };
 
   const revokeShareLink = async (
     linkId: string
   ): Promise<{ success: boolean; errorMessage?: string }> => {
-    const { error } = await supabase
-      .from('task_share_links')
-      .update({ revoked: true })
-      .eq('id', linkId);
-    if (error) return { success: false, errorMessage: error.message };
-    return { success: true };
+    try {
+      await apiFetch('POST', `/share-links/${linkId}/revoke`);
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorMessage: err instanceof ApiError ? err.message : 'Erro ao revogar.' };
+    }
   };
 
   return {

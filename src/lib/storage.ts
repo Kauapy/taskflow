@@ -1,85 +1,48 @@
-import { supabase } from './supabase';
-
-const BUCKET = 'task-attachments';
+/**
+ * Helpers de anexos no frontend. Antes falavam com o Supabase Storage;
+ * agora batem no endpoint /uploads do backend próprio.
+ */
+import { apiUpload, apiFetch, ApiError } from './api';
 
 export interface UploadedAttachment {
-  /** Caminho dentro do bucket (`{user_id}/{timestamp}-{filename}`) — usado para deletar. */
-  path: string;
-  /** URL pública para download/leitura. */
+  /** key interno (`{userId}/{timestamp}-{nome}`) — usado para deletar. */
+  key: string;
+  /** URL pública de download/leitura — guardada em tasks.attachments. */
   url: string;
-  /** Nome original do arquivo (sem timestamp), pra UI. */
   name: string;
   size: number;
   type: string;
 }
 
-/**
- * Faz upload de um arquivo para o bucket task-attachments dentro da pasta
- * do usuário. Retorna a URL pública que será salva em tasks.attachments.
- */
 export async function uploadAttachment(
-  file: File,
-  userId: string
+  file: File
 ): Promise<{ data: UploadedAttachment | null; error: string | null }> {
-  // Sanitiza o nome para evitar caracteres problemáticos em URLs
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
-  const path = `${userId}/${Date.now()}-${safeName}`;
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-
-  if (error) {
-    return { data: null, error: error.message };
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const { attachment } = await apiUpload<{ attachment: UploadedAttachment }>('/uploads', form);
+    return { data: attachment, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof ApiError ? err.message : 'Falha no upload.' };
   }
+}
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
-  return {
-    data: {
-      path,
-      url: data.publicUrl,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    },
-    error: null,
-  };
+export async function deleteAttachment(key: string): Promise<{ error: string | null }> {
+  try {
+    await apiFetch('DELETE', '/uploads', { key });
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Falha ao excluir.' };
+  }
 }
 
 /**
- * Apaga um anexo pelo seu caminho dentro do bucket. RLS garante que só o
- * dono consegue deletar; chamadas de outros usuários falham silenciosamente.
- */
-export async function deleteAttachment(path: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.storage.from(BUCKET).remove([path]);
-  return { error: error?.message ?? null };
-}
-
-/**
- * Dado uma URL pública (`.../storage/v1/object/public/task-attachments/{userId}/{file}`),
- * extrai o caminho usado para deletar. Retorna null se não bater com o padrão.
- */
-export function pathFromPublicUrl(url: string): string | null {
-  const marker = `/object/public/${BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return null;
-  return url.slice(idx + marker.length);
-}
-
-/**
- * Tenta extrair um nome amigável do arquivo a partir da URL pública
- * (remove o `{timestamp}-` que o uploader adicionou). Cai pra "anexo" se
- * a URL não seguir o padrão esperado.
+ * Nome amigável a partir da URL pública (remove o prefixo {timestamp}-).
+ * Funciona tanto para URLs do disco local quanto do S3/R2.
  */
 export function nameFromPublicUrl(url: string): string {
   try {
     const fileName = decodeURIComponent(url.split('/').pop() ?? '');
-    // Remove o prefixo numérico {timestamp}-
     const stripped = fileName.replace(/^\d{10,}-/, '');
     return stripped || 'anexo';
   } catch {

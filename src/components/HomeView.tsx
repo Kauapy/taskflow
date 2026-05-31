@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { Plus, ArrowRight, ListTodo, CheckCircle2, Clock } from 'lucide-react';
-import { Task, UserProgress } from '../lib/supabase';
+import { Task, UserProgress } from '../lib/types';
 
 interface HomeViewProps {
   userEmail: string;

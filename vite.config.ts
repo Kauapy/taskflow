@@ -18,10 +18,9 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
     env: {
-      // Stubs para o cliente Supabase. createClient só valida que existem
-      // strings; não há chamadas de rede nos testes (são mockadas/puras).
-      VITE_SUPABASE_URL: 'https://test.supabase.co',
-      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      // Base do backend nos testes. Não há chamadas de rede reais (os testes
+      // são de lógica pura e de componentes com fetch mockado/sem efeito).
+      VITE_API_URL: 'http://localhost:4000',
     },
   },
 });

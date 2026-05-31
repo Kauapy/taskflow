@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTasks } from '../hooks/useTasks';
 import { useProgress } from '../hooks/useProgress';
-import { Task } from '../lib/supabase';
+import { Task } from '../lib/types';
 import Sidebar, { ViewId } from './Sidebar';
 import TopBar from './TopBar';
 import OnboardingPanel from './OnboardingPanel';

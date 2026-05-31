@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
 import { lightTheme } from '../styles/theme';
 import Missions from './Missions';
-import type { Task, UserProgress } from '../lib/supabase';
+import type { Task, UserProgress } from '../lib/types';
 
 const wrap = (ui: React.ReactNode) =>
   render(<ThemeProvider theme={lightTheme}>{ui}</ThemeProvider>);

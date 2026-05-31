@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { Check, X, Inbox, Mail, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useShares } from '../hooks/useShares';
-import { IncomingShare } from '../lib/supabase';
+import { IncomingShare } from '../lib/types';
 
 const URGENCY = {
   alta:  { label: 'Alta',  color: '#EF4444' },

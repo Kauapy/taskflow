@@ -4,24 +4,11 @@ import { ThemeProvider } from 'styled-components';
 import { lightTheme } from '../styles/theme';
 import AddTask from './AddTask';
 
-// Mock useAuth porque o AddTask precisa do user.id para o upload.
-// Em testes não há sessão Supabase, então fornecemos um usuário fake.
-vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { id: 'test-user-id', email: 'test@example.com' },
-    loading: false,
-    signIn: vi.fn(),
-    signUp: vi.fn(),
-    signOut: vi.fn(),
-  }),
-}));
-
-// Mock o lib/storage para não tentar chamar Supabase Storage em testes
+// Mock o lib/storage para não disparar requisições HTTP reais nos testes.
 vi.mock('../lib/storage', () => ({
   uploadAttachment: vi.fn(async () => ({ data: null, error: 'mocked' })),
   deleteAttachment: vi.fn(async () => ({ error: null })),
   nameFromPublicUrl: (u: string) => u,
-  pathFromPublicUrl: () => null,
 }));
 
 const wrap = (ui: React.ReactNode) =>

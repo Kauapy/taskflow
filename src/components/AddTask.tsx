@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { X, Paperclip, Upload } from 'lucide-react';
-import { uploadAttachment, deleteAttachment, pathFromPublicUrl } from '../lib/storage';
-import { useAuth } from '../hooks/useAuth';
+import { uploadAttachment, deleteAttachment } from '../lib/storage';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 interface AttachedFile {
   url: string;
+  /** key interno do backend, usado para deletar (vazio enquanto faz upload). */
+  key: string;
   name: string;
   size: number;
   uploading: boolean;
@@ -19,7 +20,6 @@ interface AddTaskProps {
 }
 
 const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
-  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState('');
@@ -41,7 +41,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
   };
 
   const handleFiles = async (picked: FileList | null) => {
-    if (!picked || !user) return;
+    if (!picked) return;
     setAttachmentError('');
 
     for (const file of Array.from(picked)) {
@@ -52,11 +52,11 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
 
       // Placeholder enquanto o upload acontece
       const placeholder: AttachedFile = {
-        url: '', name: file.name, size: file.size, uploading: true,
+        url: '', key: '', name: file.name, size: file.size, uploading: true,
       };
       setFiles(prev => [...prev, placeholder]);
 
-      const { data, error } = await uploadAttachment(file, user.id);
+      const { data, error } = await uploadAttachment(file);
 
       setFiles(prev => {
         const idx = prev.findIndex(
@@ -68,7 +68,7 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
           // remove o placeholder em caso de erro
           copy.splice(idx, 1);
         } else {
-          copy[idx] = { url: data.url, name: data.name, size: data.size, uploading: false };
+          copy[idx] = { url: data.url, key: data.key, name: data.name, size: data.size, uploading: false };
         }
         return copy;
       });
@@ -85,10 +85,9 @@ const AddTask = ({ onAdd, onCancel }: AddTaskProps) => {
     const target = files[idx];
     if (!target) return;
     setFiles(prev => prev.filter((_, i) => i !== idx));
-    // Best-effort: apaga do Storage também
-    if (target.url) {
-      const path = pathFromPublicUrl(target.url);
-      if (path) await deleteAttachment(path);
+    // Best-effort: apaga do backend também (o key vem do upload).
+    if (target.key) {
+      await deleteAttachment(target.key);
     }
   };
 

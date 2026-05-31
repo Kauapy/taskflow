@@ -1,26 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase, UserProgress } from '../lib/supabase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiFetch } from '../lib/api';
+import { UserProgress } from '../lib/types';
 import { useAuth } from './useAuth';
 
+const POLL_INTERVAL_MS = 5000;
+
+/**
+ * Hook de progresso/gamificação.
+ *
+ * Antes usava Supabase Realtime (postgres_changes) para refletir XP/streak
+ * ao vivo. Como o backend próprio não tem WebSocket, usamos POLLING: a cada
+ * 5s buscamos GET /progress. Simples e suficiente para o caso (poucos dados,
+ * 1 usuário por sessão). `refetch` permite atualização imediata após mutações.
+ */
 export const useProgress = () => {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchProgress = useCallback(async () => {
     if (!user) return;
-
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!error && data) {
-      setProgress(data);
+    try {
+      const { progress } = await apiFetch<{ progress: UserProgress }>('GET', '/progress');
+      setProgress(progress);
+    } catch {
+      // transitório — mantém o último valor conhecido
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
@@ -32,24 +40,10 @@ export const useProgress = () => {
 
     fetchProgress();
 
-    const channel = supabase
-      .channel(`progress_changes_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_progress',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          fetchProgress();
-        }
-      )
-      .subscribe();
-
+    // Polling: substitui o canal Realtime do Supabase.
+    timerRef.current = setInterval(fetchProgress, POLL_INTERVAL_MS);
     return () => {
-      supabase.removeChannel(channel);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [user, fetchProgress]);
 

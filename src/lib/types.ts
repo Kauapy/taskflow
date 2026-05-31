@@ -1,9 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Tipos compartilhados do domínio. Antes ficavam em lib/supabase.ts;
+ * agora que o backend é próprio, este módulo não depende de SDK nenhum.
+ */
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export interface AuthUser {
+  id: string;
+  email: string;
+}
 
 export interface Task {
   id: string;
@@ -16,12 +19,12 @@ export interface Task {
   created_at: string;
   category: string;
   due_date: string | null;
-  attachments: string[]; // Array de URLs
-  shared_with: string[]; // Array de user_ids
+  attachments: string[]; // URLs
+  shared_with: string[]; // user_ids
 }
 
 export interface IncomingShare {
-  id: string;                                   // task_share id
+  id: string;
   task_id: string;
   status: 'pending' | 'accepted' | 'declined';
   shared_by: string;

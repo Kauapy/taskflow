@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import {
   CheckCircle2, AlertCircle, MapPin, Calendar, User, Eye, ArrowRight, Link2
 } from 'lucide-react';
-import { supabase, SharedTaskView } from '../lib/supabase';
+import { apiFetch, ApiError } from '../lib/api';
+import { SharedTaskView } from '../lib/types';
 
 interface Props {
   token: string;
@@ -27,18 +28,23 @@ const SharedTaskViewer = ({ token }: Props) => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase.rpc('get_shared_task_by_token', { p_token: token });
-      if (cancelled) return;
-
-      if (error) {
-        setState({ kind: 'error', message: error.message });
-        return;
-      }
-      const rows = (data as SharedTaskView[]) ?? [];
-      if (rows.length === 0) {
-        setState({ kind: 'not_found' });
-      } else {
-        setState({ kind: 'ok', data: rows[0] });
+      try {
+        // Rota pública — sem token de auth (auth: false).
+        const { task } = await apiFetch<{ task: SharedTaskView }>(
+          'GET',
+          `/public/shared/${encodeURIComponent(token)}`,
+          undefined,
+          { auth: false }
+        );
+        if (cancelled) return;
+        setState({ kind: 'ok', data: task });
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 404) {
+          setState({ kind: 'not_found' });
+        } else {
+          setState({ kind: 'error', message: err instanceof ApiError ? err.message : 'Erro ao carregar.' });
+        }
       }
     })();
     return () => { cancelled = true; };

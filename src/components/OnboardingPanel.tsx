@@ -4,7 +4,7 @@ import {
   Share2, Star, MapPin,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Task, UserProgress } from '../lib/supabase';
+import { Task, UserProgress } from '../lib/types';
 import {
   computeOnboarding, onboardingCompletion, OnboardingSlotId,
 } from '../lib/onboarding';

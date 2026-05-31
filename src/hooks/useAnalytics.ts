@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
+import { Task, UserProgress } from '../lib/types';
 import { calculateAnalytics, AnalyticsData } from '../lib/analytics';
 import { useAuth } from './useAuth';
 
@@ -10,30 +11,18 @@ export const useAnalytics = () => {
 
   const fetchAnalytics = useCallback(async () => {
     if (!user) return;
-
     setLoading(true);
-
-    const { data: tasks, error: tasksError } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    const { data: progress, error: progressError } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (progressError) {
-      console.error('Erro ao buscar progresso:', progressError);
-    }
-
-    if (!tasksError && tasks) {
+    try {
+      const [{ tasks }, { progress }] = await Promise.all([
+        apiFetch<{ tasks: Task[] }>('GET', '/tasks'),
+        apiFetch<{ progress: UserProgress }>('GET', '/progress'),
+      ]);
       setAnalytics(calculateAnalytics(tasks, progress));
+    } catch {
+      // transitório — mantém o último valor
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
