@@ -23,9 +23,20 @@ import { errorHandler } from './middleware/error';
 
 const app = express();
 
+// CORS: em produção, restringe à origem configurada (FRONTEND_ORIGIN).
+// Em dev, aceita qualquer localhost/127.0.0.1 — o Vite pode subir em 5173,
+// 5174… conforme a porta livre, e não queremos quebrar por causa disso.
 app.use(
   cors({
-    origin: config.frontendOrigin,
+    origin: (origin, callback) => {
+      // Requests sem Origin (curl, mesmo host) são permitidos.
+      if (!origin) return callback(null, true);
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (origin === config.frontendOrigin || (config.isDev && isLocalhost)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origem não permitida pelo CORS: ${origin}`));
+    },
     credentials: true,
   })
 );

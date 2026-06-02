@@ -37,13 +37,33 @@ export interface TaskRow {
 
 const urgencyEnum = z.enum(['baixa', 'media', 'alta']);
 
+// O <input type="datetime-local"> envia "YYYY-MM-DDTHH:mm" (sem segundos
+// nem offset), que não passa em z.string().datetime({offset:true}). Aceitamos
+// qualquer string que o JS consiga parsear como data — o Postgres (timestamptz)
+// também aceita esse formato. null/ausente = sem vencimento.
+const dueDateField = z
+  .string()
+  .nullable()
+  .optional()
+  .refine(
+    v => v == null || v === '' || !Number.isNaN(Date.parse(v)),
+    'Data de vencimento inválida.'
+  );
+
+// Anexos: só URLs http(s). z.string().url() sozinho aceita esquemas
+// perigosos (javascript:, data:, file:) — refinamos para barrá-los.
+const httpUrl = z
+  .string()
+  .url()
+  .refine(v => /^https?:\/\//i.test(v), 'Apenas URLs http(s) são permitidas.');
+
 const createSchema = z.object({
   title: z.string().trim().min(1, 'O título é obrigatório.').max(200),
   urgency: urgencyEnum.default('media'),
   location: z.string().max(100).default(''),
   category: z.string().max(50).default(''),
-  due_date: z.string().datetime({ offset: true }).nullable().optional(),
-  attachments: z.array(z.string().url()).max(20).default([]),
+  due_date: dueDateField,
+  attachments: z.array(httpUrl).max(20).default([]),
 });
 
 const updateSchema = z.object({
@@ -51,8 +71,8 @@ const updateSchema = z.object({
   urgency: urgencyEnum.optional(),
   location: z.string().max(100).optional(),
   category: z.string().max(50).optional(),
-  due_date: z.string().datetime({ offset: true }).nullable().optional(),
-  attachments: z.array(z.string().url()).max(20).optional(),
+  due_date: dueDateField,
+  attachments: z.array(httpUrl).max(20).optional(),
 });
 
 /** GET /tasks */
@@ -85,7 +105,7 @@ tasksRouter.post('/', async (req, res, next) => {
           body.urgency,
           body.location,
           body.category,
-          body.due_date ?? null,
+          body.due_date || null, // '' / undefined / null → NULL
           body.attachments,
         ]
       );
@@ -118,7 +138,9 @@ tasksRouter.patch('/:id', async (req, res, next) => {
     let i = 1;
     for (const key of keys) {
       setClauses.push(`${key} = $${i}`);
-      values.push(updates[key] ?? null);
+      // due_date vazio ('') vira NULL; demais campos passam direto.
+      const raw = updates[key];
+      values.push(key === 'due_date' ? (raw || null) : (raw ?? null));
       i++;
     }
     values.push(id, userId);

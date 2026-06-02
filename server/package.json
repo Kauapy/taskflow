@@ -13,6 +13,7 @@
     "smoke:tasks": "tsx src/smoke-tasks.ts",
     "smoke:shares": "tsx src/smoke-shares.ts",
     "smoke:uploads": "tsx src/smoke-uploads.ts",
+    "smoke:security": "tsx src/smoke-security.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
