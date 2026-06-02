@@ -7,204 +7,160 @@ graph TB
   subgraph Browser
     UI[React 18 + Vite + TypeScript]
     SC[styled-components<br/>tema dinâmico]
-    SDK[Supabase JS SDK]
+    API[lib/api.ts<br/>cliente HTTP + JWT]
     UI --> SC
-    UI --> SDK
+    UI --> API
   end
 
-  subgraph Supabase[Supabase BaaS]
-    AUTH[Auth<br/>e-mail/senha + JWT]
-    DB[(PostgreSQL<br/>com RLS)]
-    RT[Realtime<br/>WebSocket]
-
-    AUTH -.gera JWT.-> DB
-    DB -.eventos.-> RT
+  subgraph Backend[Backend Node/Express]
+    R[Rotas REST<br/>auth, tasks, progress,<br/>shares, public, uploads]
+    MW[requireAuth<br/>bcrypt + JWT]
+    ST[Storage<br/>disk / S3]
+    R --> MW
+    R --> ST
   end
 
-  SDK -->|HTTPS + JWT| AUTH
-  SDK -->|HTTPS PostgREST| DB
-  SDK -->|WSS| RT
+  DB[(PostgreSQL)]
+  FS[Disco / S3-compat<br/>arquivos]
 
-  classDef baas fill:#3ecf8e,stroke:#0a8b5a,color:#fff;
-  class AUTH,DB,RT baas;
+  API -->|HTTPS + Bearer JWT| R
+  MW -->|pg parametrizado| DB
+  R -->|pg parametrizado| DB
+  ST --> FS
+
+  classDef be fill:#4f8cc9,stroke:#2c5f8a,color:#fff;
+  class R,MW,ST be;
 ```
+
+A aplicação tem **três camadas próprias**: SPA no browser, API REST em Node, e PostgreSQL. O projeto nasceu sobre Supabase (BaaS) e foi migrado para esta arquitetura — o que antes era resolvido por recursos da plataforma (Auth, RLS, Realtime, Storage, RPCs) agora é código próprio no backend.
 
 ## Camadas
 
 ### Frontend (browser)
+- **React 18** com hooks customizados: [useAuth](../src/hooks/useAuth.ts), [useTheme](../src/hooks/useTheme.ts), [useTasks](../src/hooks/useTasks.ts), [useProgress](../src/hooks/useProgress.ts), [useAnalytics](../src/hooks/useAnalytics.ts), [useShares](../src/hooks/useShares.ts).
+- **styled-components 6** com tema dinâmico claro/escuro. Props customizadas são filtradas do DOM via `StyleSheetManager` + `@emotion/is-prop-valid`.
+- **Vite 5**; code-splitting com `React.lazy` para o módulo de Análises (recharts é pesado).
+- **[lib/api.ts](../src/lib/api.ts)**: único ponto de comunicação com o backend. Guarda o JWT em `localStorage` e o envia em `Authorization: Bearer`. Não há SDK de terceiros.
 
-- **React 18** com hooks customizados ([useTasks](../src/hooks/useTasks.ts), [useProgress](../src/hooks/useProgress.ts), [useAnalytics](../src/hooks/useAnalytics.ts), [useShares](../src/hooks/useShares.ts), [useAuth](../src/hooks/useAuth.ts), [useTheme](../src/hooks/useTheme.ts)).
-- **styled-components 6** para estilização (CSS-in-JS), com tema dinâmico claro/escuro plugado via `ThemeProvider`.
-- **Vite 5** como bundler. Code-splitting via `React.lazy` para o módulo de Análises (recharts é pesado).
-- **Supabase JS SDK** como única dependência de comunicação com o backend.
-- **Sem servidor próprio.** Toda lógica que não cabe no cliente vai para PL/pgSQL no banco.
+### Backend (Node/Express)
+- **Express 4 + TypeScript**, organizado em rotas finas + libs de domínio.
+- **Autenticação própria:** bcrypt para hash de senha, JWT stateless para sessão. Middleware [requireAuth](../server/src/middleware/requireAuth.ts) injeta `req.user` a partir do token.
+- **PostgreSQL** via `pg`, sempre com **queries parametrizadas** ([db.ts](../server/src/db.ts)).
+- **Storage** abstraído em driver: disco local (dev) ou S3-compatível (produção) — [lib/storage](../server/src/lib/storage/).
+- **Validação** de todo payload com zod.
 
-### Backend (Supabase BaaS)
+### Banco (PostgreSQL)
+- Schema versionado em [db/migrations/](../db/migrations/), aplicado pelo runner idempotente [migrate.ts](../server/src/migrate.ts).
+- Sem RLS: a autorização é feita no backend (ver abaixo).
 
-- PostgreSQL gerenciado, com **Row Level Security** habilitada em todas as tabelas.
-- Auth gerencia sessão JWT.
-- Realtime publica mudanças via WebSocket — usado em [useProgress](../src/hooks/useProgress.ts) para refletir XP/streak em tempo real.
-- Lógica de domínio que precisa bypass de RLS (lookup por e-mail, JOIN de shares com profiles): **funções PL/pgSQL `SECURITY DEFINER`**.
+## Autorização (substitui o RLS do Supabase)
+
+No Supabase, o isolamento entre usuários vinha de políticas RLS no banco. Agora é explícito no backend: **toda query filtra por `user_id` derivado do JWT**.
+
+```ts
+// Exemplo (routes/tasks.ts) — o usuário só vê/altera o que é seu
+await query('SELECT * FROM tasks WHERE user_id = $1', [req.user.id]);
+await query('UPDATE tasks SET ... WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+```
+
+Operações sobre recursos de outro usuário retornam **404** (não revela existência). Validado pelo `smoke:security`.
 
 ## Fluxo: autenticação
 
 ```mermaid
 sequenceDiagram
   actor U as Usuário
-  participant App as React App
-  participant Auth as Supabase Auth
-  participant DB as Postgres (RLS)
+  participant App as React (api.ts)
+  participant API as Express
+  participant DB as Postgres
 
   U->>App: e-mail + senha
-  App->>Auth: signInWithPassword
-  Auth-->>App: JWT (access_token)
-  Note over App: Token armazenado<br/>localStorage do SDK
+  App->>API: POST /auth/login
+  API->>DB: SELECT password_hash WHERE email
+  API->>API: bcrypt.compare
+  API-->>App: { token (JWT), user }
+  Note over App: token salvo em localStorage
 
-  U->>App: abre Dashboard
-  App->>DB: SELECT * FROM tasks (Authorization: Bearer JWT)
-  Note over DB: Policy:<br/>auth.uid() = user_id
-  DB-->>App: apenas as tarefas do usuário
+  U->>App: abre o app depois
+  App->>API: GET /auth/me (Bearer token)
+  API->>API: verifyToken (requireAuth)
+  API-->>App: { user }  → sessão restaurada
 ```
 
-## Fluxo: criar e completar tarefa
+## Fluxo: criar e concluir tarefa
 
 ```mermaid
 sequenceDiagram
   actor U as Usuário
-  participant App as React App
+  participant App as React
+  participant API as Express
   participant DB as Postgres
 
-  U->>App: preenche AddTask, submit
-  App->>DB: INSERT INTO tasks
-  DB-->>App: linha criada
-  App->>DB: UPDATE user_progress (+10 XP, total_tasks_created++, ...)
+  U->>App: nova tarefa
+  App->>API: POST /tasks (Bearer)
+  API->>DB: BEGIN; INSERT tasks; onTaskCreated (+10 XP, recalc locais); COMMIT
+  API-->>App: { task }
 
-  U->>App: clica em ✓ (concluir)
-  App->>DB: UPDATE tasks SET completed=true, completed_at=now()
-  DB-->>App: linha atualizada
-  App->>App: applyStreakOnCompletion (lib pura)
-  App->>DB: UPDATE user_progress (+50 XP, streak novo, level recalc)
-
-  Note over DB: Realtime publica<br/>UPDATE em user_progress
-  DB-->>App: WebSocket → useProgress refetch
+  U->>App: concluir
+  App->>API: POST /tasks/:id/complete
+  API->>DB: UPDATE completed=true; onTaskCompleted (+50 XP, streak)
+  API-->>App: { task }
+  Note over App: useProgress faz polling (5s) e reflete XP/streak
 ```
 
-## Fluxo: compartilhamento
+## Fluxo: compartilhamento por link público
 
 ```mermaid
 sequenceDiagram
-  actor A as Usuário A (sharer)
-  participant App as React App
+  actor A as Dono
+  participant App as React
+  participant API as Express
   participant DB as Postgres
-  actor B as Usuário B (recipient)
+  actor V as Visitante (sem login)
 
-  A->>App: clicar em Share, digita e-mail de B
-  App->>DB: rpc('find_user_id_by_email', email)
-  Note over DB: SECURITY DEFINER<br/>bypassa RLS de profiles
-  DB-->>App: user_id de B (ou null)
-  App->>DB: INSERT INTO task_shares (status='pending')
+  A->>App: gerar link
+  App->>API: POST /share-links (Bearer)
+  API->>DB: INSERT task_share_links (token aleatório)
+  API-->>App: { link.token } → URL /shared/<token>
 
-  B->>App: abre aba Compartilhadas
-  App->>DB: rpc('get_incoming_shares')
-  Note over DB: JOIN com profiles e tasks<br/>resolve email do sharer
-  DB-->>App: lista pendente + aceita
-
-  B->>App: clica Aceitar
-  App->>DB: UPDATE task_shares SET status='accepted'
-  Note over DB: Nova policy SELECT em tasks:<br/>destinatário com share aceito vê a tarefa
+  V->>App: abre /shared/<token>
+  App->>API: GET /public/shared/:token  (SEM auth)
+  API->>DB: valida token (não revogado/expirado) + view_count++ + JOIN tarefa/dono
+  API-->>App: { task } → página somente-leitura
 ```
-
-## Fluxo: link público
-
-```mermaid
-sequenceDiagram
-  actor A as Usuário A (dono)
-  participant App as React App
-  participant DB as Postgres
-  actor V as Visitante (anônimo)
-
-  A->>App: ShareTaskDialog → aba Link → Gerar
-  App->>DB: INSERT INTO task_share_links (token gerado pelo Postgres)
-  DB-->>App: {token, url, view_count: 0}
-  App->>A: mostra link, botão Copiar
-
-  V->>App: abre /shared/<token> (sem login)
-  Note over App: getSharedToken() detecta a rota<br/>renderiza SharedTaskViewer
-  App->>DB: rpc('get_shared_task_by_token', token)
-  Note over DB: SECURITY DEFINER<br/>1. Valida revoked/expires<br/>2. UPDATE view_count = +1<br/>3. JOIN tasks + profiles
-  DB-->>App: {title, urgency, location, email do dono, ...}
-  App->>V: página somente-leitura + CTA "Criar conta"
-
-  A->>App: clica Revogar
-  App->>DB: UPDATE task_share_links SET revoked=true
-  Note over DB: Próxima chamada da RPC<br/>retornará vazio → 404
-```
-
-## Row Level Security — políticas em vigor
-
-| Tabela          | Operação       | Quem pode                                              |
-| --------------- | -------------- | ------------------------------------------------------ |
-| `tasks`         | SELECT         | dono **OU** destinatário com share `accepted`          |
-| `tasks`         | INSERT         | apenas dono                                            |
-| `tasks`         | UPDATE         | apenas dono                                            |
-| `tasks`         | DELETE         | apenas dono                                            |
-| `user_progress` | SELECT/INSERT/UPDATE | apenas o próprio                                 |
-| `task_shares`   | SELECT         | sharer **OU** destinatário                             |
-| `task_shares`   | INSERT         | apenas o sharer (`auth.uid() = shared_by`)             |
-| `task_shares`   | UPDATE         | apenas o destinatário (para aceitar)                   |
-| `task_shares`   | DELETE         | sharer (revogar) **OU** destinatário (recusar/remover) |
-| `profiles`      | SELECT         | apenas o próprio (cross-user via RPC SECURITY DEFINER) |
-| `task_share_links` | SELECT/INSERT/UPDATE/DELETE | apenas o dono (`created_by`); leitura pública via RPC |
-
-## RPCs (`SECURITY DEFINER`)
-
-- **`find_user_id_by_email(text) → uuid`** — resolve e-mail para `user_id` sem expor a tabela `profiles` para outros usuários.
-- **`get_incoming_shares() → table`** — retorna em uma chamada todos os shares onde o caller é destinatário, com title/urgency/local da tarefa e o e-mail do sharer já resolvidos via JOIN no servidor (evita N+1).
-- **`get_shared_task_by_token(text) → table`** — valida um token de link público (não revogado, não expirado), incrementa o contador de visualizações e retorna a tarefa + e-mail do dono. Concedida a `anon` para permitir acesso **sem login**.
 
 ## Decisões arquiteturais
 
-### 1. Supabase como BaaS único, sem backend próprio
+### 1. Backend próprio em vez de BaaS
+**Trade-off:** mais código (auth, autorização, storage) que antes vinha pronto.
+**Justificativa:** controle total, sem vendor lock-in nem pausa de free tier, e valor didático para o TCC (mostra auth, REST, SQL, segurança).
 
-**Trade-off:** menos flexibilidade que um backend Node/Python customizado.
-**Justificativa:** dentro do escopo de TCC, o foco é o **produto** e a **experiência**, não a operação de servidores. Auth, escala, backups e migrations são problemas que o Supabase resolve.
+### 2. Autorização no backend em vez de RLS
+**Trade-off:** disciplina de sempre filtrar por `user_id` em cada query.
+**Justificativa:** mais simples de entender/depurar que políticas SQL; centralizado e testável (`smoke:security`).
 
-### 2. styled-components em vez de Tailwind ou CSS Modules
+### 3. Polling em vez de WebSocket (Realtime)
+**Trade-off:** atualização a cada 5s, não instantânea.
+**Justificativa:** suficiente para 1 usuário por sessão; evita complexidade de WebSocket. Só o progresso (XP/streak) precisava de "tempo real".
 
-**Trade-off:** custo de runtime (CSS-in-JS) e bundle size.
-**Justificativa:** tematização dinâmica (claro/escuro) com props é trivial — props passam direto para o CSS, sem classes condicionais. Tailwind também foi tentado e removido por estar sendo subutilizado.
+### 4. Storage com driver plugável (disk/S3)
+**Trade-off:** uma camada de abstração a mais.
+**Justificativa:** disco em dev (zero setup), S3-compatível (R2/B2/AWS) em produção, trocando uma variável de ambiente.
 
-### 3. RLS no banco em vez de validação no app
+### 5. Lógica pura separada dos hooks/rotas
+`streak.ts`, `analytics.ts`, `onboarding.ts` (frontend) e `streak.ts`/`progress.ts` (backend) são funções puras testáveis sem mockar rede/DB.
 
-**Trade-off:** mais lógica em SQL/PL/pgSQL, debug menos amigável.
-**Justificativa:** **defense-in-depth.** Mesmo que o frontend tivesse um bug — ou um atacante chamasse a API direto com seu próprio JWT — o banco impede vazamento. Segurança por padrão.
+## Migração Supabase → backend próprio (resumo)
 
-### 4. RPCs `SECURITY DEFINER` em vez de afrouxar RLS de `profiles`
+| Antes (Supabase) | Agora |
+| ---------------- | ----- |
+| `auth.users` + Auth | tabela `auth_users` + bcrypt + JWT |
+| RLS (políticas SQL) | filtro `user_id` em cada query |
+| RPCs `SECURITY DEFINER` | endpoints REST |
+| Realtime (WebSocket) | polling de `GET /progress` |
+| Supabase Storage | driver disk/S3 + `/uploads` |
+| `@supabase/supabase-js` no front | `lib/api.ts` (fetch) |
 
-**Trade-off:** mais código no banco.
-**Justificativa:** o usuário pode achar quem ele já sabe o e-mail (caso de uso real), mas **não consegue enumerar** toda a base de usuários. Privacidade preservada.
+## Organização de pastas
 
-### 5. Lógica pura em `lib/` separada de hooks
-
-**Trade-off:** dois lugares para manter (módulo + hook).
-**Justificativa:** `applyStreakOnCompletion` e `calculateAnalytics` são funções puras determinísticas — testáveis sem mockar nada. Os hooks ficam ocupados só com side effects (fetch + state).
-
-## Estrutura de pastas
-
-```
-src/
-  components/      Componentes React: Login, Dashboard, AddTask, TaskList,
-                   Missions, Analytics, ShareTaskDialog, SharedTasks, ConfirmDialog
-  contexts/        Provedores de contexto: AuthContext, ThemeContext
-  hooks/           Hooks customizados: useAuth, useTheme, useTasks, useProgress,
-                   useAnalytics, useShares
-  lib/             Lógica pura testável: streak.ts, analytics.ts; cliente supabase.ts
-  styles/          theme (claro/escuro) + GlobalStyles
-  test/            Setup do Vitest
-
-supabase/
-  migrations/      SQL versionado: schema, advanced features, profiles + sharing
-
-docs/              PROBLEMA, ARQUITETURA, ERD, MANUAL
-.github/workflows/ CI: typecheck + lint + test + build
-```
+Ver a seção "Estrutura do projeto" no [README](../README.md).

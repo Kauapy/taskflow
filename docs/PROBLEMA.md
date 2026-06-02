@@ -26,10 +26,10 @@ Desenvolver uma aplicação web responsiva de gerenciamento de tarefas pessoais 
 
 ## Objetivos específicos
 
-1. **Implementar autenticação** segura por e-mail/senha usando um BaaS (Supabase Auth).
-2. **Modelar a base de dados** com Row Level Security para garantir isolamento de dados entre usuários.
+1. **Implementar autenticação** segura por e-mail/senha com hash bcrypt e sessão via JWT, em backend próprio (Node/Express).
+2. **Modelar a base de dados** (PostgreSQL) garantindo isolamento entre usuários via autorização na aplicação (filtro por `user_id` em cada consulta).
 3. **Desenvolver CRUD completo** de tarefas com atributos avançados (urgência, localização, categoria, data de vencimento, anexos).
-4. **Implementar sistema de gamificação** com XP, níveis, sequências de dias consecutivos e 14 missões com progresso visual.
+4. **Implementar sistema de gamificação** com XP, níveis, sequências de dias consecutivos e missões progressivas em cadeia.
 5. **Construir dashboard analítico** com gráficos de produtividade semanal e mensal, taxa de conclusão e tempo médio de execução.
 6. **Permitir compartilhamento** colaborativo de tarefas entre usuários, com fluxo de aceitar/recusar.
 7. **Garantir acessibilidade** básica (WCAG 2.1, nível AA): `aria-label`, navegação por teclado, opção de aumento de fonte, tema escuro.

@@ -1,34 +1,57 @@
 # Relatório Técnico — Taskflow
 
 > Documento que consolida a análise inicial, o trabalho realizado e o estado atual do projeto.
-> Última atualização: 2026-05-09.
+> Última atualização: 2026-06-01.
 
 ## 1. Resumo do projeto
 
-**Taskflow** é uma aplicação web responsiva de gerenciamento de tarefas pessoais com **gamificação** (XP, níveis, sequências de dias e missões) e **dashboard analítico**. Backend serverless via **Supabase** (Auth + PostgreSQL com RLS + Realtime). Frontend SPA em **React + TypeScript + Vite**, com **styled-components** e **recharts**.
+**Taskflow** é uma aplicação web responsiva de gerenciamento de tarefas pessoais com **gamificação** (XP, níveis, sequências de dias e missões progressivas) e **dashboard analítico**.
 
-**Estágio atual:** **MVP funcional** com cobertura de testes, CI e documentação acadêmica. Apto para apresentação em banca.
+**Arquitetura atual:** SPA em **React + TypeScript + Vite** (frontend) consumindo uma **API REST própria em Node + Express + TypeScript** (backend), com **PostgreSQL** como banco. O projeto começou sobre **Supabase (BaaS)** e foi **migrado para um backend próprio** (auth com bcrypt+JWT, autorização na aplicação, storage em disco/S3, polling no lugar de Realtime).
+
+**Estágio atual:** **MVP funcional** com cobertura de testes, testes de segurança, CI e documentação. Apto para apresentação em banca.
 
 ## 2. Tecnologias
 
 | Camada | Tecnologia |
 |---|---|
 | Frontend | React 18, TypeScript 5.5, Vite 5 |
-| Estilização | styled-components 6 (tema dinâmico claro/escuro) |
-| Ícones | lucide-react |
-| Gráficos | recharts 3 |
-| Backend (BaaS) | Supabase (Auth, Postgres com RLS, Realtime) |
-| Testes | Vitest 4, Testing Library, jest-dom, jsdom |
-| Lint/Type | ESLint 9, typescript-eslint 8 |
-| CI | GitHub Actions |
+| Estilização | styled-components 6 (tema claro/escuro; filtro de props via @emotion/is-prop-valid) |
+| Ícones / Gráficos | lucide-react / recharts 3 |
+| Backend | Node + Express 4 + TypeScript |
+| Banco | PostgreSQL (driver `pg`, queries parametrizadas) |
+| Auth | bcrypt (hash de senha) + JWT (sessão stateless) |
+| Upload/Storage | multer + driver disk / S3-compatível (`@aws-sdk/client-s3`) |
+| Validação | zod |
+| Testes | Vitest + Testing Library (front); smoke tests funcionais e de segurança (back) |
+| Lint/Type/CI | ESLint 9, typescript-eslint 8, GitHub Actions |
+
+## 2.1. Migração de BaaS (Supabase) para backend próprio
+
+O projeto nasceu usando **Supabase** como backend pronto. Por decisão de TCC (controle total, evitar pausa de free tier e demonstrar competências de backend/SQL/segurança), toda a camada foi reescrita como um **servidor Node/Express + PostgreSQL** próprio, em fases pequenas e testadas.
+
+| Recurso | Antes (Supabase) | Depois (backend próprio) |
+|---|---|---|
+| Autenticação | Supabase Auth | tabela `auth_users` + bcrypt + JWT (`/auth/signup`, `/auth/login`, `/auth/me`) |
+| Isolamento de dados | Row Level Security (RLS) | filtro `WHERE user_id = <JWT>` em cada query |
+| Lógica no banco | RPCs `SECURITY DEFINER` | endpoints REST (`/shares`, `/public/shared/:token`, …) |
+| Tempo real | Supabase Realtime (WebSocket) | polling de `GET /progress` (5s) |
+| Arquivos | Supabase Storage | driver `disk` (dev) / `s3` (R2/AWS/B2) via `/uploads` |
+| Cliente | `@supabase/supabase-js` | `src/lib/api.ts` (fetch + JWT) |
+| Schema | migrations Supabase | `db/migrations/` aplicadas por runner idempotente |
+
+**Ganhos medidos:** bundle inicial do frontend caiu de ~489 kB para ~292 kB (−40%, removendo o SDK). Backend com **0 vulnerabilidades** no `npm audit`. Bateria de **10 testes de segurança** automatizados cobrindo auth, isolamento, SQL injection, XSS, path traversal e enumeração de e-mail — todos passando.
+
+**Limitação herdada da migração:** contas criadas no Supabase **não** foram migradas (o hash de senha é interno do Supabase); usuários recadastram no novo backend.
 
 ## 3. Funcionalidades entregues
 
-- 🔐 **Autenticação** por e-mail/senha (Supabase Auth).
-- ✅ **CRUD completo** de tarefas com urgência, localização, categoria, data de vencimento, anexos (URLs), busca em tempo real e contagem regressiva ao vivo.
-- 🎮 **Gamificação** com XP por ação (+10 criar, +50 completar), nível (`floor(xp/500)+1`), sequência de dias consecutivos com lógica determinística (mesmo dia / ontem / gap), e **14 missões** com progresso visual.
+- 🔐 **Autenticação** por e-mail/senha com bcrypt + JWT (backend próprio).
+- ✅ **CRUD completo** de tarefas com urgência, localização, categoria, data de vencimento, anexos, busca em tempo real e contagem regressiva ao vivo.
+- 🎮 **Gamificação** com XP por ação (+10 criar, +50 completar), nível (`floor(xp/500)+1`), sequência de dias consecutivos com lógica determinística (mesmo dia / ontem / gap), e **missões progressivas em cadeia** (ao bater o alvo, a próxima missão entra no lugar).
 - 📊 **Dashboard analítico** com 4 KPIs no topo, gráfico de barras semanal (8 semanas) e gráfico de linha mensal (6 meses).
-- 🤝 **Compartilhamento** de tarefas por e-mail entre usuários, com fluxo aceitar/recusar e RLS para tornar a tarefa visível ao destinatário.
+- 🤝 **Compartilhamento** por e-mail (aceitar/recusar) ou por **link público** (sem cadastro); visibilidade controlada pela autorização do backend.
+- 📎 **Upload de arquivos** (qualquer tipo, até 10 MB) via backend (driver disk/S3).
 - 🌗 **Tema claro/escuro** com persistência em `localStorage`.
 - 🔠 **Aumento de fonte** (acessibilidade) com 3 níveis e persistência.
 - ♿ **Acessibilidade** com `aria-label` em todos os botões só de ícone, navegação por teclado, foco visível, modal com `role="dialog"` + `aria-modal` + Esc.
@@ -106,12 +129,12 @@ A funcionalidade estava modelada no banco mas a UI não existia. Entregue:
 
 ## 6. Limitações conhecidas (declaradas)
 
-- Tarefas compartilhadas são **read-only** para o destinatário. Co-edição exigiria policy UPDATE adicional + resolução de conflitos.
+- Tarefas compartilhadas são **read-only** para o destinatário. Co-edição exigiria endpoint de update compartilhado + resolução de conflitos.
 - Sem sincronização offline ou PWA.
-- Anexos são apenas **links** (sem upload de arquivos para Supabase Storage).
-- Sem reset de senha pela UI (Supabase Auth oferece via API; UI não exposta).
-- Sem notificação push/e-mail quando alguém compartilha (poderia usar Realtime).
-- 6 vulnerabilidades em dev-deps do Vite (correção requer upgrade major; PR separado).
+- Progresso em tempo real usa **polling** (5s), não WebSocket.
+- Sem reset de senha pela UI.
+- Sem notificação push/e-mail quando alguém compartilha.
+- Frontend: vulnerabilidades dev-only em deps do Vite (correção exige upgrade major). Backend: **0 vulnerabilidades**.
 
 ## 7. Riscos para apresentação — mitigados
 
@@ -128,21 +151,21 @@ A funcionalidade estava modelada no banco mas a UI não existia. Entregue:
 
 - Testes E2E reais com **Playwright** (esqueleto sugerido no README).
 - PWA / sincronização offline.
-- Upload de arquivos como anexos via Supabase Storage.
-- Notificação Realtime quando alguém compartilha uma tarefa.
+- Notificação (push/e-mail) quando alguém compartilha uma tarefa.
 - Co-edição de tarefas compartilhadas.
 - Reset de senha pela UI.
 - App mobile nativo (React Native compartilhando hooks).
 - Internacionalização (i18n) — hoje é só pt-BR.
+- Atualizar o Vite (major) para zerar as vulns dev-only do frontend.
 
 ## 9. Próximos passos sugeridos antes da apresentação
 
-1. **Aplicar todas as migrations** num projeto Supabase fresco e validar que tudo roda.
-2. **Capturar screenshots** e plugar em `docs/MANUAL.md` (placeholders já marcados).
-3. **Rodar o checklist manual** do README inteiro pelo menos uma vez.
-4. **Hospedar uma demo** em Vercel/Netlify para a banca poder testar.
-5. **Preparar slides** com os diagramas Mermaid renderizados (qualquer editor Markdown moderno renderiza).
-6. (Opcional) **Implementar a spec Playwright** sugerida — meia hora de trabalho a mais e elimina a única lacuna restante.
+1. **Subir o ambiente** (Postgres + `npm run migrate` no backend + backend + frontend) e validar o fluxo completo no navegador.
+2. **Hospedar a demo:** backend em Railway/Render + Postgres gerenciado (Neon) + frontend em Vercel/Netlify, apontando `VITE_API_URL` para o backend publicado.
+3. **Capturar screenshots** e plugar em `docs/MANUAL.md` (placeholders já marcados).
+4. **Rodar o checklist manual** do README e os smokes do backend (`npm run smoke:*`).
+5. **Preparar slides** com os diagramas Mermaid de `docs/ARQUITETURA.md` renderizados.
+6. (Opcional) **Implementar a spec Playwright** sugerida para cobrir o golden path E2E.
 
 ## 10. Histórico desta revisão
 
