@@ -47,18 +47,27 @@ const ShareTaskDialog = ({
     setLinksLoading(false);
   }, [task, onListLinks]);
 
+  // Reseta o formulário e carrega os links SÓ quando o dialog abre para uma
+  // tarefa (o id muda). Depender de onClose/refreshLinks aqui faria o effect
+  // re-rodar a cada render do pai (ex.: polling de 5s), resetando a aba
+  // selecionada para 'email' — bug que impedia abrir a aba "Por link público".
   useEffect(() => {
     if (!task) return;
     setTab('email');
     setEmail(''); setEmailError(''); setEmailSuccess(''); setEmailSubmitting(false);
     setExpiresInDays(0); setLinkError(''); setGenerating(false); setCopiedToken(null);
     refreshLinks();
+    emailInputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
 
+  // Listener de Escape em effect separado (pode re-rodar sem efeito colateral).
+  useEffect(() => {
+    if (!task) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
-    emailInputRef.current?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [task, onClose, refreshLinks]);
+  }, [task, onClose]);
 
   if (!task) return null;
 
